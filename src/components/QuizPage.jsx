@@ -379,7 +379,7 @@ function QuizPage() {
     return (
       <div style={styles.loadingOverlay}>
         <div className="spinner" style={styles.spinnerStyle} />
-        <h2 style={{ color: "#000" }}>{disqualified ? "Disqualified" : "Calculating your rank..."}</h2>
+        <h2 style={{ color: "#000" }}>{disqualified ? "Disqualified" : "Calculating your result..."}</h2>
       </div>
     );
   }
