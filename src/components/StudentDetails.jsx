@@ -215,15 +215,7 @@ function Registration() {
   return (
     <div style={styles.pageWrapper}>
       <div style={styles.card}>
-        {/* --- New text lines added at the top --- */}
-        <div style={styles.headerTexts}>
-          <p style={styles.warningText}>
-            Please login 5 minutes before the start of the exam
-          </p>
-          <p style={styles.subtitleText}>
-            National Science And Technology Digital Archive (NSTAD) Online Quiz.
-          </p>
-        </div>
+       
 
         <h2 style={styles.title}>📝 Register for Quiz</h2>
         <form onSubmit={handleSubmit} style={styles.form}>
