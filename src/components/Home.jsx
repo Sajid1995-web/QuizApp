@@ -315,7 +315,7 @@ const styles = {
     flex: 1,
   },
   mainTitle: {
-    fontSize: "32px", 
+    fontSize: "36px", 
     fontWeight: "800",
     color: "#1a1a40",
     margin: "0 0 12px 0",
@@ -343,7 +343,7 @@ const styles = {
     margin: "0 0 18px 0",
   },
   descText: {
-    fontSize: "17px", 
+    fontSize: "20px", 
     lineHeight: "1.6",
     color: "#4a4a6a",
     margin: 0,
