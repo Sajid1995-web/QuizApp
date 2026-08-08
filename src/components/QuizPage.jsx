@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
-const API_BASE = "http://localhost:3000";
+const API_BASE = "https://quizappbackend-k09m.onrender.com";
 
 const shuffleArray = (array) => {
   const newArray = [...array];
