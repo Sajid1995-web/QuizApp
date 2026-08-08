@@ -12,7 +12,7 @@ function RulesPage() {
 
       <div style={styles.card}>
         {/* Image on top right – exact path */}
-        <img src="/assets/RulesPic.jpeg" alt="Rules Icon" style={styles.topImage} />
+        <img src="/assets/RulesPic.png" alt="Rules Icon" style={styles.topImage} />
 
         {/* Introduction */}
         <div style={styles.introBox}>
