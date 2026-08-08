@@ -562,24 +562,24 @@ const styles = {
   progressBar: { height: "100%", backgroundColor: "#0066b3", transition: "width 0.3s ease" },
   
   bodyRow: { 
-    display: "flex", 
-    flex: 1, 
-    flexWrap: "wrap", 
-    overflowY: "auto", 
-    padding: "clamp(0.5rem, 2vw, 1rem)", 
-    gap: "1rem" 
-  },
-  
+  display: "flex", 
+  flex: 1, 
+  overflow: "hidden", 
+  padding: "1rem", 
+  gap: "2rem", // Increased gap to push sidebar right
+  justifyContent: "space-between" // This pushes elements apart
+},
   mainContent: { 
-    flex: "1 1 300px", 
-    padding: "clamp(1rem, 3vw, 2rem)", 
-    overflowY: "auto", 
-    backgroundColor: "#ffffff", 
-    borderRadius: "12px", 
-    boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-    display: "flex", 
-    flexDirection: "column"
-  },
+  flex: 1, 
+  padding: "2rem", 
+  overflowY: "auto", 
+  backgroundColor: "#ffffff", 
+  borderRadius: "12px", 
+  boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+  display: "flex", 
+  flexDirection: "column",
+  minWidth: 0, // Allows it to shrink if needed
+},
   
   questionText: { fontSize: "clamp(1rem, 2.5vw, 1.15rem)", lineHeight: 1.6, margin: "1rem 0 0.5rem", color: "#000", fontWeight: 500 },
   questionImage: { maxWidth: "100%", maxHeight: "30vh", margin: "0.75rem 0", objectFit: "contain", borderRadius: "8px", border: "1px solid #e5e7eb" },
@@ -630,36 +630,45 @@ const styles = {
     textAlign: "center"
   },
   
-  sidebar: { 
-    flex: "1 1 200px", 
-    maxWidth: "100%", 
-    backgroundColor: "#ffffff", 
-    borderRadius: "12px", 
-    boxShadow: "0 2px 8px rgba(0,0,0,0.06)", 
-    padding: "clamp(0.8rem, 2vw, 1.2rem) clamp(0.5rem, 2vw, 1rem)", 
-    overflowY: "auto", 
-    display: "flex", 
-    flexDirection: "column" 
-  },
-  paletteGrid: { 
-    display: "grid", 
-    gridTemplateColumns: "repeat(auto-fill, minmax(40px, 1fr))", 
-    gap: "0.5rem", 
-    margin: "0.5rem 0 1rem" 
-  },
-  paletteItem: { 
-    width: "100%", 
-    aspectRatio: "1/1",
-    minHeight: "40px",
-    display: "flex", 
-    alignItems: "center", 
-    justifyContent: "center", 
-    borderRadius: "8px", 
-    fontWeight: 600, 
-    fontSize: "0.85rem", 
-    margin: "0 auto", 
-    color: "#000" 
-  },
+ // Replace the bodyRow style
+
+
+// Replace the sidebar style - make it smaller
+sidebar: { 
+  width: 180, // Reduced from 220 to 180
+  minWidth: 150, // Minimum width
+  maxWidth: 200, // Maximum width
+  backgroundColor: "#ffffff", 
+  borderRadius: "12px", 
+  boxShadow: "0 2px 8px rgba(0,0,0,0.06)", 
+  padding: "1rem 0.8rem", // Reduced padding
+  overflowY: "auto", 
+  display: "flex", 
+  flexDirection: "column",
+  marginLeft: "auto", // Pushes it to the right
+  flexShrink: 0 // Prevents it from shrinking
+},
+
+// Make palette items smaller
+paletteGrid: { 
+  display: "grid", 
+  gridTemplateColumns: "repeat(4, 1fr)", 
+  gap: "0.4rem", // Reduced gap
+  margin: "0.5rem 0 0.8rem" 
+},
+
+paletteItem: { 
+  width: "35px", // Reduced from 40px
+  height: "35px", // Reduced from 40px
+  display: "flex", 
+  alignItems: "center", 
+  justifyContent: "center", 
+  borderRadius: "8px", 
+  fontWeight: 600, 
+  fontSize: "0.8rem", // Smaller font
+  margin: "0 auto", 
+  color: "#000" 
+},
   sidebarFooter: { borderTop: "1px solid #e5e7eb", paddingTop: "0.75rem", fontSize: "clamp(0.75rem, 1.5vw, 0.85rem)", display: "flex", flexDirection: "column", gap: "0.4rem" },
   dot: { display: "inline-block", width: 12, height: 12, borderRadius: "50%", marginRight: 6 },
   loadingOverlay: { display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", height: "100vh", backgroundColor: "#f8fafc" },
