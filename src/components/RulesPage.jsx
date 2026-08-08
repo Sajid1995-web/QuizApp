@@ -1,8 +1,9 @@
-import React from "react";
+ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 function RulesPage() {
   const navigate = useNavigate();
+  const [agreed, setAgreed] = useState(false);
 
   return (
     <div style={styles.page}>
@@ -18,9 +19,7 @@ function RulesPage() {
           ← Back to Home
         </button>
 
-        <h1 style={styles.title}>📜 NSTAD Online Quiz – Rules & Regulations</h1>
-
-        {/* Introduction – verbatim from the document */}
+        {/* Introduction – verbatim from the document, no extra heading */}
         <div style={styles.introBox}>
           <p style={styles.introText}>
             <strong>National Science and Technology Digital Archive (NSTAD)</strong> invites you to participate in
@@ -39,7 +38,7 @@ function RulesPage() {
           </p>
         </div>
 
-        {/* Rules List – exactly as per the document (5 sections) */}
+        {/* Rules – exactly 5 sections as per the document */}
         <div style={styles.rulesContainer}>
           <div style={styles.rulesGrid}>
             {/* 01. Eligibility */}
@@ -112,36 +111,61 @@ function RulesPage() {
           </div>
         </div>
 
-        {/* Action Buttons */}
+        {/* Checkbox & Action Buttons */}
         <div style={styles.actionGroup}>
-          <button
-            style={styles.primaryBtn}
-            onClick={() => navigate("/register")}
-            onMouseEnter={(e) => {
-              e.target.style.transform = "translateY(-3px)";
-              e.target.style.boxShadow = "0 8px 25px rgba(108, 92, 231, 0.4)";
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.transform = "translateY(0)";
-              e.target.style.boxShadow = "0 4px 15px rgba(108, 92, 231, 0.25)";
-            }}
-          >
-            📝 Register Now
-          </button>
-          <button
-            style={styles.secondaryBtn}
-            onClick={() => navigate("/login")}
-            onMouseEnter={(e) => {
-              e.target.style.transform = "translateY(-3px)";
-              e.target.style.boxShadow = "0 8px 25px rgba(46, 213, 115, 0.4)";
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.transform = "translateY(0)";
-              e.target.style.boxShadow = "0 4px 15px rgba(46, 213, 115, 0.25)";
-            }}
-          >
-            🔑 Student Login
-          </button>
+          <label style={styles.checkboxLabel}>
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              style={styles.checkbox}
+            />
+            I have read and agree to all the rules and regulations.
+          </label>
+          <div style={styles.buttonGroup}>
+            <button
+              style={{
+                ...styles.primaryBtn,
+                opacity: agreed ? 1 : 0.5,
+                cursor: agreed ? "pointer" : "not-allowed",
+              }}
+              onClick={() => agreed && navigate("/register")}
+              disabled={!agreed}
+              onMouseEnter={(e) => {
+                if (agreed) {
+                  e.target.style.transform = "translateY(-3px)";
+                  e.target.style.boxShadow = "0 8px 25px rgba(108, 92, 231, 0.4)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.transform = "translateY(0)";
+                e.target.style.boxShadow = "0 4px 15px rgba(108, 92, 231, 0.25)";
+              }}
+            >
+              📝 Register Now
+            </button>
+            <button
+              style={{
+                ...styles.secondaryBtn,
+                opacity: agreed ? 1 : 0.5,
+                cursor: agreed ? "pointer" : "not-allowed",
+              }}
+              onClick={() => agreed && navigate("/login")}
+              disabled={!agreed}
+              onMouseEnter={(e) => {
+                if (agreed) {
+                  e.target.style.transform = "translateY(-3px)";
+                  e.target.style.boxShadow = "0 8px 25px rgba(46, 213, 115, 0.4)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.transform = "translateY(0)";
+                e.target.style.boxShadow = "0 4px 15px rgba(46, 213, 115, 0.25)";
+              }}
+            >
+              🔑 Student Login
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -219,13 +243,6 @@ const styles = {
     alignItems: "center",
     gap: "4px",
   },
-  title: {
-    fontSize: "24px",
-    fontWeight: "800",
-    color: "#1a1a2e",
-    margin: "0 0 8px",
-    letterSpacing: "-0.5px",
-  },
   introBox: {
     textAlign: "left",
     backgroundColor: "#f5f3ff",
@@ -243,7 +260,7 @@ const styles = {
   rulesContainer: {
     flex: "1 1 auto",
     overflowY: "auto",
-    marginBottom: "16px",
+    marginBottom: "12px",
     paddingRight: "4px",
   },
   rulesGrid: {
@@ -297,10 +314,30 @@ const styles = {
   },
   actionGroup: {
     display: "flex",
+    flexDirection: "column",
+    gap: "10px",
+    marginTop: "8px",
+  },
+  checkboxLabel: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    fontSize: "14px",
+    color: "#333",
+    cursor: "pointer",
+    justifyContent: "center",
+  },
+  checkbox: {
+    width: "18px",
+    height: "18px",
+    cursor: "pointer",
+    accentColor: "#6c5ce7",
+  },
+  buttonGroup: {
+    display: "flex",
     gap: "12px",
     justifyContent: "center",
     flexWrap: "wrap",
-    marginTop: "6px",
   },
   primaryBtn: {
     display: "inline-flex",
@@ -311,7 +348,6 @@ const styles = {
     fontWeight: "700",
     borderRadius: "12px",
     border: "none",
-    cursor: "pointer",
     background: "linear-gradient(135deg, #6c5ce7, #5a4bd1)",
     color: "#fff",
     boxShadow: "0 4px 15px rgba(108, 92, 231, 0.25)",
@@ -326,7 +362,6 @@ const styles = {
     fontWeight: "700",
     borderRadius: "12px",
     border: "2px solid #e0dcee",
-    cursor: "pointer",
     background: "#fff",
     color: "#4a4a6a",
     boxShadow: "0 4px 15px rgba(0,0,0,0.05)",
