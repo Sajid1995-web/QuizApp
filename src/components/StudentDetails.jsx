@@ -1,6 +1,9 @@
- import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "./App.css";
+
+// Base URL for all API calls
+const API_BASE = "https://quizappbackend-k09m.onrender.com";
 
 function Registration() {
   const navigate = useNavigate();
@@ -14,7 +17,7 @@ function Registration() {
   const [email, setEmail] = useState("");
 
   useEffect(() => {
-    fetch("https://quizappbackend-k09m.onrender.com/registration-config")
+    fetch(`${API_BASE}/registration-config`)
       .then((r) => r.json())
       .then((data) => {
         if (data.success) {
@@ -97,7 +100,7 @@ function Registration() {
     console.log("📤 Submitting payload:", payload);
 
     try {
-      const res = await fetch("https://quizappbackend-k09m.onrender.com/register", {
+      const res = await fetch(`${API_BASE}/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -212,11 +215,23 @@ function Registration() {
   return (
     <div style={styles.pageWrapper}>
       <div style={styles.card}>
+        {/* --- New text lines added at the top --- */}
+        <div style={styles.headerTexts}>
+          <p style={styles.warningText}>
+            Please login 5 minutes before the start of the exam
+          </p>
+          <p style={styles.subtitleText}>
+            National Science And Technology Digital Archive (NSTAD) Online Quiz.
+          </p>
+        </div>
+
         <h2 style={styles.title}>📝 Register for Quiz</h2>
         <form onSubmit={handleSubmit} style={styles.form}>
           {/* ---- Hardcoded Name field ---- */}
           <div className="form-group">
-            <label className="form-label">Full Name <span style={{ color: "var(--danger)" }}>*</span></label>
+            <label className="form-label">
+              Full Name <span style={{ color: "var(--danger)" }}>*</span>
+            </label>
             <input
               type="text"
               placeholder="Enter your full name"
@@ -229,7 +244,9 @@ function Registration() {
 
           {/* ---- Hardcoded Email field ---- */}
           <div className="form-group">
-            <label className="form-label">Email <span style={{ color: "var(--danger)" }}>*</span></label>
+            <label className="form-label">
+              Email <span style={{ color: "var(--danger)" }}>*</span>
+            </label>
             <input
               type="email"
               placeholder="Enter your email address"
@@ -243,7 +260,11 @@ function Registration() {
           {/* ---- Extra custom fields from admin config ---- */}
           {enabledFields.map(([field, settings]) => renderField(field, settings))}
 
-          <button type="submit" disabled={submitting} style={styles.submitBtn}>
+          <button
+            type="submit"
+            disabled={submitting}
+            style={styles.submitBtn}
+          >
             {submitting ? (
               <span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                 <span className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }} />
@@ -256,7 +277,11 @@ function Registration() {
         </form>
         <p style={styles.loginLink}>
           Already registered?{" "}
-          <button onClick={() => navigate("/login")} type="button" style={styles.linkBtn}>
+          <button
+            onClick={() => navigate("/login")}
+            type="button"
+            style={styles.linkBtn}
+          >
             Go to login
           </button>
         </p>
@@ -284,6 +309,23 @@ const styles = {
     padding: "2.5rem",
     maxWidth: 500,
     width: "100%",
+  },
+  headerTexts: {
+    marginBottom: "1.5rem",
+    textAlign: "center",
+  },
+  warningText: {
+    color: "#d9534f", // Bootstrap danger color
+    fontWeight: 600,
+    fontSize: "0.95rem",
+    margin: 0,
+    marginBottom: "0.25rem",
+  },
+  subtitleText: {
+    fontSize: "1.1rem",
+    fontWeight: 500,
+    color: "var(--text-secondary)",
+    margin: 0,
   },
   title: {
     marginBottom: "1.5rem",
