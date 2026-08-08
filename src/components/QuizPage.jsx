@@ -1,4 +1,4 @@
- import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 const API_BASE = "https://quizappbackend-k09m.onrender.com";
@@ -17,13 +17,12 @@ function QuizPage() {
   const { state } = useLocation();
   const student = state?.student;
   const examStartTime = state?.examStartTime ? new Date(state.examStartTime) : null;
-  const examDuration = state?.examDuration || 30;
 
   const [questions, setQuestions] = useState([]);
   const [quizReady, setQuizReady] = useState(false);
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState([]);
-  const [timeLeft, setTimeLeft] = useState(examDuration * 60);
+  const [timeLeft, setTimeLeft] = useState(0);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [quizActive, setQuizActive] = useState(false);
@@ -44,9 +43,9 @@ function QuizPage() {
     const elem = document.documentElement;
     if (elem.requestFullscreen) {
       elem.requestFullscreen().catch(err => console.error(err));
-    } else if (elem.webkitRequestFullscreen) { // Safari
+    } else if (elem.webkitRequestFullscreen) {
       elem.webkitRequestFullscreen();
-    } else if (elem.msRequestFullscreen) { // IE11
+    } else if (elem.msRequestFullscreen) {
       elem.msRequestFullscreen();
     }
   };
@@ -124,13 +123,12 @@ function QuizPage() {
     };
   }, []);
 
-  // ---------- Quiz status polling (WITH SECURE TIME SYNC) ----------
+  // ---------- Global Server Quiz Status & Timer Polling ----------
   useEffect(() => {
-    if (quizActive || !student) return;
+    if (!student) return;
 
     const checkStatus = async () => {
       try {
-        // Fetch both status AND server time to prevent local clock cheating
         const [statusRes, timeRes] = await Promise.all([
           fetch(`${API_BASE}/quiz-status`),
           fetch(`${API_BASE}/servertime`)
@@ -142,12 +140,21 @@ function QuizPage() {
 
         if (data.isQuizOpen) {
           setQuizActive(true);
+          // STRICT GLOBAL END TIME SYNC:
+          const serverEnd = new Date(data.endTime);
+          const remainingSecs = Math.max(0, Math.floor((serverEnd - serverNow) / 1000));
+          setTimeLeft(remainingSecs);
+
+          // If global end time is reached, trigger expiration
+          if (remainingSecs === 0 && !submitted) {
+            handleTimeExpired();
+          }
         } else if (data.hasEnded) {
           alert("The quiz has ended. You cannot take it now.");
           navigate("/login");
         } else {
-          if (examStartTime) {
-            const diff = Math.ceil((examStartTime - serverNow) / 1000);
+          if (data.startTime) {
+            const diff = Math.ceil((new Date(data.startTime) - serverNow) / 1000);
             setWaitTime(diff > 0 ? diff : 0);
           }
         }
@@ -159,9 +166,9 @@ function QuizPage() {
     checkStatus();
     const interval = setInterval(checkStatus, 1000);
     return () => clearInterval(interval);
-  }, [quizActive, student, navigate, examStartTime]);
+  }, [student, navigate, submitted]);
 
-  // ---------- Fetch questions & SET SECURE TIMER ----------
+  // ---------- Fetch questions on active quiz ----------
   useEffect(() => {
     if (!quizActive) return;
 
@@ -171,12 +178,6 @@ function QuizPage() {
       setQuestionsError(null);
 
       try {
-        // 1. Fetch exact server time right before starting
-        const timeRes = await fetch(`${API_BASE}/servertime`);
-        const timeData = await timeRes.json();
-        const currentServerTime = new Date(timeData.serverTimeUTC);
-
-        // 2. Start/Resume Attempt
         const startRes = await fetch(`${API_BASE}/start-quiz`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -191,20 +192,6 @@ function QuizPage() {
         }
 
         if (!startData.success) throw new Error(startData.message);
-
-        // 3. SECURE TIME SYNC: Calculate remaining time using SERVER time, not laptop time!
-        const attemptStartTime = new Date(startData.startTime);
-        const attemptEndTime = new Date(attemptStartTime.getTime() + startData.durationMinutes * 60000);
-        const remainingSeconds = Math.floor((attemptEndTime - currentServerTime) / 1000);
-
-        if (remainingSeconds <= 0) {
-          setDisqualified(true);
-          setDisqualifiedMessage("Your time limit has expired. You cannot re-enter the quiz.");
-          setLoadingQuestions(false);
-          return;
-        }
-
-        setTimeLeft(remainingSeconds);
 
         const res = await fetch(`${API_BASE}/get-questions`);
         const data = await res.json();
@@ -269,7 +256,6 @@ function QuizPage() {
         });
         const data = await res.json();
         
-        // Exit fullscreen securely
         if (document.fullscreenElement && document.exitFullscreen) {
             document.exitFullscreen().catch(err => console.log(err));
         }
@@ -303,29 +289,6 @@ function QuizPage() {
       submitQuizRef.current(true); 
     }
   }, []);
-
-  useEffect(() => {
-    if (!quizActive || submitted || questions.length === 0 || disqualified) return;
-
-    timerRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timerRef.current);
-          handleTimeExpired();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timerRef.current);
-  }, [quizActive, submitted, questions.length, disqualified, handleTimeExpired]);
-
-  useEffect(() => {
-    if (quizActive && quizReady && !submitted && timeLeft === 0 && !disqualified) {
-      handleTimeExpired();
-    }
-  }, [timeLeft, quizActive, quizReady, submitted, disqualified, handleTimeExpired]);
 
 
   // ---------- View Renders ----------
@@ -545,7 +508,7 @@ const styles = {
   // DYNAMIC GRID TOP BAR
   topBar: { 
     display: "grid", 
-    gridTemplateColumns: "1fr auto 1fr", // 3 Columns: Left, Center, Right
+    gridTemplateColumns: "1fr auto 1fr", 
     alignItems: "center", 
     padding: "clamp(0.5rem, 2vw, 0.75rem) clamp(1rem, 4vw, 2rem)", 
     backgroundColor: "#ffffff", 
@@ -574,7 +537,7 @@ const styles = {
   // FIXED SUBMIT BUTTON 
   primaryBtn: { 
     padding: "clamp(0.5rem, 2vw, 0.6rem) clamp(1rem, 3vw, 1.5rem)", 
-    fontSize: "clamp(0.9rem, 2vw, 1rem)", // NO MORE 3rem
+    fontSize: "clamp(0.9rem, 2vw, 1rem)", 
     fontWeight: 600, 
     backgroundColor: "#0066b3", 
     color: "#fff", 
@@ -583,13 +546,12 @@ const styles = {
     cursor: "pointer", 
     boxShadow: "0 2px 8px rgba(0, 102, 179, 0.25)",
     width: "fit-content",
-    justifySelf: "flex-end" // Anchors exactly to the right edge
+    justifySelf: "flex-end" 
   },
   
   progressBarContainer: { height: 4, backgroundColor: "#e5e7eb", width: "100%" },
   progressBar: { height: "100%", backgroundColor: "#0066b3", transition: "width 0.3s ease" },
   
-  // DYNAMIC BODY ROW (Wraps Sidebar on tiny screens)
   bodyRow: { 
     display: "flex", 
     flex: 1, 
@@ -620,7 +582,6 @@ const styles = {
   radioDotActive: { width: 10, height: 10, borderRadius: "50%", backgroundColor: "#0066b3" },
   optionText: { flex: "0 1 auto", lineHeight: 1.4, color: "#000", whiteSpace: "nowrap" },
   
-  // RESPONSIVE NAV ROW (Buttons will wrap and stack if squeezed)
   navRow: { 
     display: "flex", 
     flexWrap: "wrap",
