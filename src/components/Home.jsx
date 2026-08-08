@@ -226,7 +226,7 @@ const styles = {
     flexShrink: 0,
   },
   introText: {
-    fontSize: "14px",
+    fontSize: "20px",
     lineHeight: "1.6",
     color: "#2d2d44",
     margin: "4px 0",
