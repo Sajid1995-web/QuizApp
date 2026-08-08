@@ -315,14 +315,14 @@ const styles = {
     flex: 1,
   },
   mainTitle: {
-    fontSize: "36px", 
+    fontSize: "45px", 
     fontWeight: "800",
     color: "#1a1a40",
     margin: "0 0 12px 0",
     lineHeight: "1.3",
   },
   subTitle: {
-    fontSize: "25px", 
+    fontSize: "28px", 
     color: "#2d2d44",
     margin: "0 0 16px 0",
     lineHeight: "1.5",
