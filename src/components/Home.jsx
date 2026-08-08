@@ -10,11 +10,12 @@ function RulesPage() {
       {/* Embedded CSS for perfect Mobile & PC layout */}
       <style>
         {`
+          /* PC & Global Rules */
           .responsive-header {
             display: flex;
             flex-direction: row;
             gap: 24px;
-            align-items: center; /* Centers the image with the text vertically */
+            align-items: center;
             margin-bottom: 24px;
           }
           .responsive-image {
@@ -29,23 +30,33 @@ function RulesPage() {
             flex-direction: row;
             gap: 16px;
             justify-content: center;
-            align-items: center; /* Prevents vertical stretching */
+            align-items: center;
             flex-wrap: wrap;
             margin-top: 8px;
             width: 100%;
           }
           .action-btn {
-            min-width: 220px;
-            height: 50px; /* Locks the button height */
+            width: 220px; /* Strict width */
+            height: 48px !important; /* Strict height locks the button from vertical stretching */
             display: flex;
             justify-content: center;
             align-items: center;
+            box-sizing: border-box; /* Prevents padding from inflating the button */
+            flex-shrink: 0;
           }
           
           /* Mobile adjustments */
           @media (max-width: 768px) {
             .rules-card {
-              padding: 20px 16px !important;
+              padding: 24px 16px !important;
+              height: auto !important; /* Allows the card to grow on mobile */
+              min-height: 100vh;
+              overflow: visible !important;
+            }
+            .rules-scroll-box {
+              overflow-y: visible !important; /* Let the whole page scroll naturally on phones */
+              height: auto !important;
+              flex: none !important;
             }
             .responsive-header {
               flex-direction: column-reverse; /* Puts image above text on phones */
@@ -59,16 +70,20 @@ function RulesPage() {
             .responsive-buttons {
               flex-direction: column; /* Stack on mobile */
               align-items: center;
+              gap: 14px;
             }
             .action-btn {
               width: 100%;
-              max-width: 300px; /* Prevents them from being ridiculously wide on tablets */
+              max-width: 250px; /* Prevents horizontal stretching on mobile */
             }
             .main-title {
               font-size: 22px !important;
             }
             .sub-title {
-              font-size: 17px !important;
+              font-size: 16px !important;
+            }
+            .nstad-box {
+              margin-top: 20px !important; /* Bring it closer on mobile */
             }
           }
         `}
@@ -109,7 +124,7 @@ function RulesPage() {
         </div>
 
         {/* Rules Container */}
-        <div style={styles.rulesContainer}>
+        <div style={styles.rulesContainer} className="rules-scroll-box">
           <div style={styles.rulesGrid}>
             <div style={styles.ruleCard}>
               <div style={styles.ruleNumber}>01</div>
@@ -163,7 +178,7 @@ function RulesPage() {
             </div>
           </div>
 
-          <div style={styles.nstadBox}>
+          <div style={styles.nstadBox} className="nstad-box">
             📌 Explore the National Science and Technology Digital Archive:{" "}
             <a href="https://www.nstad.in" target="_blank" rel="noopener noreferrer" style={styles.nstadLink}>
               www.nstad.in
@@ -251,7 +266,7 @@ const styles = {
     padding: 0,
     margin: 0,
     position: "relative",
-    overflow: "hidden",
+    overflowX: "hidden", /* Keeps circles from causing horizontal scroll, but allows vertical natural scroll */
   },
   bgCircle1: {
     position: "absolute",
@@ -275,7 +290,7 @@ const styles = {
   },
   card: {
     width: "100%",
-    height: "100vh",
+    height: "100vh", /* Stays fixed height for app-feel on Desktop */
     backgroundColor: "rgba(255,255,255,0.97)",
     borderRadius: 0,
     padding: "30px 36px 20px",
@@ -286,34 +301,34 @@ const styles = {
     backdropFilter: "blur(10px)",
     display: "flex",
     flexDirection: "column",
-    overflow: "hidden",
+    overflow: "hidden", 
   },
   introBox: {
     display: "flex",
     flexDirection: "column",
-    alignItems: "center", /* Centers items horizontally */
-    textAlign: "center", /* Centers text alignment */
+    alignItems: "center", 
+    textAlign: "center", 
     backgroundColor: "#f5f3ff",
     padding: "20px 24px",
     borderRadius: "12px",
-    borderTop: "5px solid #6c5ce7", /* Moved accent line to the top for center symmetry */
+    borderTop: "5px solid #6c5ce7", 
     flex: 1,
   },
   mainTitle: {
-    fontSize: "26px", /* Increased size */
+    fontSize: "26px", 
     fontWeight: "800",
     color: "#1a1a40",
     margin: "0 0 12px 0",
     lineHeight: "1.3",
   },
   subTitle: {
-    fontSize: "19px", /* Increased size */
+    fontSize: "19px", 
     color: "#2d2d44",
     margin: "0 0 16px 0",
     lineHeight: "1.5",
   },
   highlightText: {
-    fontSize: "22px", /* Increased size */
+    fontSize: "22px", 
     fontWeight: "800",
     color: "#6c5ce7",
   },
@@ -328,7 +343,7 @@ const styles = {
     margin: "0 0 18px 0",
   },
   descText: {
-    fontSize: "16px", /* Increased size */
+    fontSize: "15px", 
     lineHeight: "1.6",
     color: "#4a4a6a",
     margin: 0,
@@ -413,7 +428,6 @@ const styles = {
     accentColor: "#6c5ce7",
   },
   primaryBtn: {
-    padding: "0 24px",
     fontSize: "16px",
     fontWeight: "700",
     borderRadius: "10px",
@@ -424,7 +438,6 @@ const styles = {
     transition: "all 0.25s ease",
   },
   secondaryBtn: {
-    padding: "0 24px",
     fontSize: "16px",
     fontWeight: "700",
     borderRadius: "10px",
