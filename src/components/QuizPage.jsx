@@ -155,7 +155,7 @@ function QuizPage() {
             handleTimeExpired();
           }
         } else if (statusData.hasEnded) {
-          alert("The quiz has ended. You cannot take it now.");
+          alert("The quiz has ended. You cannot take it now.Please register again");
           navigate("/login");
         } else {
           if (statusData.startTime) {
