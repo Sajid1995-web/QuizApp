@@ -1,4 +1,4 @@
- import React, { useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 function RulesPage() {
@@ -6,31 +6,34 @@ function RulesPage() {
   const [agreed, setAgreed] = useState(false);
 
   return (
-    <div style={styles.page}>
-      <div style={styles.bgCircle1} />
-      <div style={styles.bgCircle2} />
+    <div className="min-h-screen w-full bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 flex items-center justify-center p-0 m-0 font-sans relative overflow-hidden">
 
-      <div style={styles.card}>
-        {/* Image on top right – exact path */}
-        <img src="/assets/RulesPic.png" alt="Rules Icon" style={styles.topImage} />
+      {/* Decorative glass circles */}
+      <div className="absolute w-96 h-96 rounded-full bg-purple-500/20 blur-3xl -top-20 -right-20 pointer-events-none" />
+      <div className="absolute w-80 h-80 rounded-full bg-blue-500/20 blur-3xl -bottom-20 -left-20 pointer-events-none" />
 
-        {/* Back to Home */}
-        <button style={styles.backBtn} onClick={() => navigate("/")}>
-          ← Back to Home
-        </button>
+      {/* Full‑screen glass card */}
+      <div className="w-full h-screen bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl flex flex-col relative overflow-hidden px-4 sm:px-8 md:px-12 lg:px-16 py-4 sm:py-6 md:py-8">
 
-        {/* Introduction – verbatim from the document, no extra heading */}
-        <div style={styles.introBox}>
-          <p style={styles.introText}>
+        {/* Image – top right */}
+        <img
+          src="/assets/RulesPic.png"
+          alt="Rules Icon"
+          className="absolute top-4 right-4 sm:top-6 sm:right-8 w-12 sm:w-16 md:w-20 h-auto rounded-xl shadow-lg border border-white/30"
+        />
+
+        {/* Introduction */}
+        <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-xl p-4 sm:p-5 md:p-6 mb-4 md:mb-6 flex-shrink-0 text-left shadow-md">
+          <p className="text-sm sm:text-base md:text-lg text-white leading-relaxed drop-shadow">
             <strong>National Science and Technology Digital Archive (NSTAD)</strong> invites you to participate in
             an <strong>Online Quiz</strong> based on available archival documents at{" "}
-            <a href="https://nstad.in" target="_blank" rel="noopener noreferrer" style={styles.nstadLink}>
+            <a href="https://nstad.in" target="_blank" rel="noopener noreferrer" className="text-indigo-200 font-semibold underline hover:text-white transition">
               nstad.in
             </a>
             . <br />
             <strong>Quiz Date:</strong> 09.08.2026 &nbsp;|&nbsp; <strong>Time:</strong> 21:00 Hrs
           </p>
-          <p style={styles.introText}>
+          <p className="text-sm sm:text-base md:text-lg text-white/90 leading-relaxed mt-1 drop-shadow">
             The National Science and Technology Digital Archive (NSTAD) invites science enthusiasts, students,
             researchers, and the general public to participate in an online quiz celebrating the life, work, and
             scientific legacy of <strong>Acharya Prafulla Chandra Ray</strong>, one of India's greatest chemists and
@@ -38,130 +41,119 @@ function RulesPage() {
           </p>
         </div>
 
-        {/* Rules – exactly 5 sections as per the document */}
-        <div style={styles.rulesContainer}>
-          <div style={styles.rulesGrid}>
-            {/* 01. Eligibility */}
-            <div style={styles.ruleCard}>
-              <div style={styles.ruleNumber}>01</div>
-              <div style={styles.ruleContent}>
-                <strong>Eligibility:</strong> The quiz is open to students of Class XI, Class XII, and Undergraduates
-                from any recognized school, college, or university. Participation is free of cost. Each participant is
-                permitted to submit only one entry. Multiple submissions by the same participant may lead to disqualification.
-              </div>
-            </div>
-
-            {/* 02. Quiz Format */}
-            <div style={styles.ruleCard}>
-              <div style={{ ...styles.ruleNumber, background: "linear-gradient(135deg, #e17055, #d63031)" }}>02</div>
-              <div style={styles.ruleContent}>
-                <strong>Quiz Format:</strong> The quiz consists of multiple-choice questions (MCQs). Participants are
-                encouraged to explore the collections of scientists pages available on{" "}
-                <a href="https://www.nstad.in" target="_blank" rel="noopener noreferrer" style={{ color: "#6c5ce7", fontWeight: 600 }}>
-                  www.nstad.in
-                </a>{" "}
-                before attempting the quiz. Participants are encouraged to register themselves on the portal before
-                participation and may enter into the quiz portal by using login credentials. A credential received
-                immediately after registration can be used for participation.
-              </div>
-            </div>
-
-            {/* 03. Submission Guidelines */}
-            <div style={styles.ruleCard}>
-              <div style={{ ...styles.ruleNumber, background: "linear-gradient(135deg, #00b894, #00cec9)" }}>03</div>
-              <div style={styles.ruleContent}>
-                <strong>Submission Guidelines:</strong> The quiz will be available only on <strong>9th August, 2026
-                at 21:00 Hrs</strong>. Portal will not allow to participate and enter into the webpage except
-                scheduled time. Duration of the quiz is <strong>10 Minutes</strong> and Questions will be displayed
-                one by one. During the active session participants can change the response. At the end they must
-                submit the responses to register the answer. If not submitted within schedule time, it can be
-                treated as disqualified. Once submitted, responses cannot be edited or resubmitted.
-              </div>
-            </div>
-
-            {/* 04. Evaluation */}
-            <div style={styles.ruleCard}>
-              <div style={{ ...styles.ruleNumber, background: "linear-gradient(135deg, #fdcb6e, #e17055)" }}>04</div>
-              <div style={styles.ruleContent}>
-                <strong>Evaluation:</strong> Each correct answer carries <strong>One mark</strong>. There is negative
-                marking. <strong>One mark will be deducted</strong> for 1 wrong answer. In the event of a tie,
-                participants who submitted their entries fastest will be considered as winner. If required, the
-                organizing committee may apply additional tie‑breaking criteria. Winners will be selected based on
-                the highest scores in accordance with the quiz rules.
-              </div>
-            </div>
-
-            {/* 05. Disclaimer */}
-            <div style={styles.ruleCard}>
-              <div style={{ ...styles.ruleNumber, background: "linear-gradient(135deg, #6c5ce7, #a29bfe)" }}>05</div>
-              <div style={styles.ruleContent}>
-                <strong>Disclaimer:</strong> By participating, entrants agree to abide by these Rules &amp; Regulations.
-                The organizers reserve the right to modify, postpone, or cancel the quiz under unforeseen circumstances
-                without prior notice.
-              </div>
-            </div>
+        {/* Rules Container – scrollable if content overflows */}
+        <div className="flex-1 overflow-y-auto mb-3 md:mb-4 pr-1 space-y-2.5 sm:space-y-3">
+          {/* Rule 01 */}
+          <div className="flex gap-3 sm:gap-4 items-start bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-3 sm:p-4 hover:bg-white/15 transition">
+            <span className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-indigo-400 to-purple-400 text-white font-extrabold text-sm sm:text-base flex items-center justify-center shadow-md">
+              01
+            </span>
+            <p className="text-xs sm:text-sm md:text-base text-white/95 leading-relaxed">
+              <strong>Eligibility:</strong> The quiz is open to students of Class XI, Class XII, and Undergraduates
+              from any recognized school, college, or university. Participation is free of cost. Each participant is
+              permitted to submit only one entry. Multiple submissions by the same participant may lead to disqualification.
+            </p>
           </div>
 
-          {/* NSTAD link reminder */}
-          <div style={styles.nstadBox}>
+          {/* Rule 02 */}
+          <div className="flex gap-3 sm:gap-4 items-start bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-3 sm:p-4 hover:bg-white/15 transition">
+            <span className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-red-400 to-orange-400 text-white font-extrabold text-sm sm:text-base flex items-center justify-center shadow-md">
+              02
+            </span>
+            <p className="text-xs sm:text-sm md:text-base text-white/95 leading-relaxed">
+              <strong>Quiz Format:</strong> The quiz consists of multiple-choice questions (MCQs). Participants are
+              encouraged to explore the collections of scientists pages available on{" "}
+              <a href="https://www.nstad.in" target="_blank" rel="noopener noreferrer" className="text-indigo-200 font-semibold underline hover:text-white transition">
+                www.nstad.in
+              </a>{" "}
+              before attempting the quiz. Participants are encouraged to register themselves on the portal before
+              participation and may enter into the quiz portal by using login credentials. A credential received
+              immediately after registration can be used for participation.
+            </p>
+          </div>
+
+          {/* Rule 03 */}
+          <div className="flex gap-3 sm:gap-4 items-start bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-3 sm:p-4 hover:bg-white/15 transition">
+            <span className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-green-400 to-emerald-400 text-white font-extrabold text-sm sm:text-base flex items-center justify-center shadow-md">
+              03
+            </span>
+            <p className="text-xs sm:text-sm md:text-base text-white/95 leading-relaxed">
+              <strong>Submission Guidelines:</strong> The quiz will be available only on <strong>9th August, 2026
+              at 21:00 Hrs</strong>. Portal will not allow to participate and enter into the webpage except
+              scheduled time. Duration of the quiz is <strong>10 Minutes</strong> and Questions will be displayed
+              one by one. During the active session participants can change the response. At the end they must
+              submit the responses to register the answer. If not submitted within schedule time, it can be
+              treated as disqualified. Once submitted, responses cannot be edited or resubmitted.
+            </p>
+          </div>
+
+          {/* Rule 04 */}
+          <div className="flex gap-3 sm:gap-4 items-start bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-3 sm:p-4 hover:bg-white/15 transition">
+            <span className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-yellow-400 to-amber-400 text-white font-extrabold text-sm sm:text-base flex items-center justify-center shadow-md">
+              04
+            </span>
+            <p className="text-xs sm:text-sm md:text-base text-white/95 leading-relaxed">
+              <strong>Evaluation:</strong> Each correct answer carries <strong>One mark</strong>. There is negative
+              marking. <strong>One mark will be deducted</strong> for 1 wrong answer. In the event of a tie,
+              participants who submitted their entries fastest will be considered as winner. If required, the
+              organizing committee may apply additional tie‑breaking criteria. Winners will be selected based on
+              the highest scores in accordance with the quiz rules.
+            </p>
+          </div>
+
+          {/* Rule 05 */}
+          <div className="flex gap-3 sm:gap-4 items-start bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-3 sm:p-4 hover:bg-white/15 transition">
+            <span className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-blue-400 to-indigo-400 text-white font-extrabold text-sm sm:text-base flex items-center justify-center shadow-md">
+              05
+            </span>
+            <p className="text-xs sm:text-sm md:text-base text-white/95 leading-relaxed">
+              <strong>Disclaimer:</strong> By participating, entrants agree to abide by these Rules &amp; Regulations.
+              The organizers reserve the right to modify, postpone, or cancel the quiz under unforeseen circumstances
+              without prior notice.
+            </p>
+          </div>
+
+          {/* NSTAD box */}
+          <div className="mt-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-3 sm:p-4 text-left text-sm sm:text-base text-indigo-100">
             📌 Explore the National Science and Technology Digital Archive:{" "}
-            <a href="https://www.nstad.in" target="_blank" rel="noopener noreferrer" style={styles.nstadLink}>
+            <a href="https://www.nstad.in" target="_blank" rel="noopener noreferrer" className="font-bold underline text-indigo-200 hover:text-white transition">
               www.nstad.in
             </a>
           </div>
         </div>
 
-        {/* Checkbox & Action Buttons */}
-        <div style={styles.actionGroup}>
-          <label style={styles.checkboxLabel}>
+        {/* Checkbox & Buttons – fixed at bottom */}
+        <div className="flex-shrink-0 flex flex-col gap-3 mt-2 pt-2 border-t border-white/10">
+          <label className="flex items-center justify-center gap-2 text-sm sm:text-base text-white/90 cursor-pointer">
             <input
               type="checkbox"
               checked={agreed}
               onChange={(e) => setAgreed(e.target.checked)}
-              style={styles.checkbox}
+              className="w-4 h-4 sm:w-5 sm:h-5 accent-indigo-500 cursor-pointer"
             />
             I have read and agree to all the rules and regulations.
           </label>
-          <div style={styles.buttonGroup}>
+
+          <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
             <button
-              style={{
-                ...styles.primaryBtn,
-                opacity: agreed ? 1 : 0.5,
-                cursor: agreed ? "pointer" : "not-allowed",
-              }}
+              className={`inline-flex items-center gap-2 px-5 sm:px-7 py-2.5 sm:py-3 rounded-xl font-bold text-sm sm:text-base transition-all duration-200 ${
+                agreed
+                  ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg hover:shadow-indigo-500/40 hover:-translate-y-1"
+                  : "bg-white/20 text-white/40 cursor-not-allowed backdrop-blur-sm"
+              }`}
               onClick={() => agreed && navigate("/register")}
               disabled={!agreed}
-              onMouseEnter={(e) => {
-                if (agreed) {
-                  e.target.style.transform = "translateY(-3px)";
-                  e.target.style.boxShadow = "0 8px 25px rgba(108, 92, 231, 0.4)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.transform = "translateY(0)";
-                e.target.style.boxShadow = "0 4px 15px rgba(108, 92, 231, 0.25)";
-              }}
             >
               📝 Register Now
             </button>
             <button
-              style={{
-                ...styles.secondaryBtn,
-                opacity: agreed ? 1 : 0.5,
-                cursor: agreed ? "pointer" : "not-allowed",
-              }}
+              className={`inline-flex items-center gap-2 px-5 sm:px-7 py-2.5 sm:py-3 rounded-xl font-bold text-sm sm:text-base border transition-all duration-200 ${
+                agreed
+                  ? "border-white/30 bg-white/10 text-white hover:bg-white/20 hover:-translate-y-1 backdrop-blur-sm"
+                  : "border-white/10 bg-white/5 text-white/30 cursor-not-allowed"
+              }`}
               onClick={() => agreed && navigate("/login")}
               disabled={!agreed}
-              onMouseEnter={(e) => {
-                if (agreed) {
-                  e.target.style.transform = "translateY(-3px)";
-                  e.target.style.boxShadow = "0 8px 25px rgba(46, 213, 115, 0.4)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.transform = "translateY(0)";
-                e.target.style.boxShadow = "0 4px 15px rgba(46, 213, 115, 0.25)";
-              }}
             >
               🔑 Student Login
             </button>
@@ -173,198 +165,3 @@ function RulesPage() {
 }
 
 export default RulesPage;
-
-const styles = {
-  page: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: "100vh",
-    background: "linear-gradient(135deg, #0f0c29, #1a1a40, #24243e)",
-    fontFamily: "'Segoe UI', 'Inter', system-ui, sans-serif",
-    padding: "24px",
-    position: "relative",
-    overflow: "hidden",
-  },
-  bgCircle1: {
-    position: "absolute",
-    width: "350px",
-    height: "350px",
-    borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(108,92,231,0.25) 0%, transparent 70%)",
-    top: "-80px",
-    right: "-60px",
-    pointerEvents: "none",
-  },
-  bgCircle2: {
-    position: "absolute",
-    width: "280px",
-    height: "280px",
-    borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(46,213,115,0.2) 0%, transparent 70%)",
-    bottom: "-70px",
-    left: "-50px",
-    pointerEvents: "none",
-  },
-  card: {
-    maxWidth: "620px",
-    width: "100%",
-    backgroundColor: "rgba(255,255,255,0.97)",
-    borderRadius: "20px",
-    padding: "40px 36px 32px",
-    boxShadow: "0 20px 60px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.1) inset",
-    textAlign: "center",
-    position: "relative",
-    zIndex: 1,
-    backdropFilter: "blur(10px)",
-    maxHeight: "90vh",
-    display: "flex",
-    flexDirection: "column",
-  },
-  topImage: {
-    position: "absolute",
-    top: "20px",
-    right: "20px",
-    width: "60px",
-    height: "auto",
-    borderRadius: "8px",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-  },
-  backBtn: {
-    alignSelf: "flex-start",
-    background: "none",
-    border: "none",
-    color: "#6c5ce7",
-    fontSize: "15px",
-    fontWeight: "700",
-    cursor: "pointer",
-    marginBottom: "10px",
-    display: "flex",
-    alignItems: "center",
-    gap: "4px",
-  },
-  introBox: {
-    textAlign: "left",
-    backgroundColor: "#f5f3ff",
-    padding: "12px 16px",
-    borderRadius: "10px",
-    marginBottom: "18px",
-    borderLeft: "4px solid #6c5ce7",
-  },
-  introText: {
-    fontSize: "14px",
-    lineHeight: "1.7",
-    color: "#2d2d44",
-    margin: "4px 0",
-  },
-  rulesContainer: {
-    flex: "1 1 auto",
-    overflowY: "auto",
-    marginBottom: "12px",
-    paddingRight: "4px",
-  },
-  rulesGrid: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "10px",
-    textAlign: "left",
-  },
-  ruleCard: {
-    display: "flex",
-    gap: "14px",
-    alignItems: "flex-start",
-    backgroundColor: "#faf9ff",
-    borderRadius: "12px",
-    padding: "14px 16px",
-    border: "1px solid #eeeafc",
-  },
-  ruleNumber: {
-    flexShrink: 0,
-    width: "36px",
-    height: "36px",
-    borderRadius: "10px",
-    background: "linear-gradient(135deg, #6c5ce7, #a29bfe)",
-    color: "#fff",
-    fontWeight: "800",
-    fontSize: "14px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  ruleContent: {
-    flex: 1,
-    fontSize: "14px",
-    lineHeight: "1.6",
-    color: "#333",
-  },
-  nstadBox: {
-    marginTop: "14px",
-    backgroundColor: "#eef2ff",
-    borderRadius: "10px",
-    padding: "10px 16px",
-    fontSize: "14px",
-    color: "#1a237e",
-    borderLeft: "4px solid #6c5ce7",
-    textAlign: "left",
-  },
-  nstadLink: {
-    color: "#6c5ce7",
-    fontWeight: 700,
-    textDecoration: "underline",
-  },
-  actionGroup: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "10px",
-    marginTop: "8px",
-  },
-  checkboxLabel: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    fontSize: "14px",
-    color: "#333",
-    cursor: "pointer",
-    justifyContent: "center",
-  },
-  checkbox: {
-    width: "18px",
-    height: "18px",
-    cursor: "pointer",
-    accentColor: "#6c5ce7",
-  },
-  buttonGroup: {
-    display: "flex",
-    gap: "12px",
-    justifyContent: "center",
-    flexWrap: "wrap",
-  },
-  primaryBtn: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "8px",
-    padding: "14px 28px",
-    fontSize: "15px",
-    fontWeight: "700",
-    borderRadius: "12px",
-    border: "none",
-    background: "linear-gradient(135deg, #6c5ce7, #5a4bd1)",
-    color: "#fff",
-    boxShadow: "0 4px 15px rgba(108, 92, 231, 0.25)",
-    transition: "all 0.25s ease",
-  },
-  secondaryBtn: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "8px",
-    padding: "14px 28px",
-    fontSize: "15px",
-    fontWeight: "700",
-    borderRadius: "12px",
-    border: "2px solid #e0dcee",
-    background: "#fff",
-    color: "#4a4a6a",
-    boxShadow: "0 4px 15px rgba(0,0,0,0.05)",
-    transition: "all 0.25s ease",
-  },
-};
