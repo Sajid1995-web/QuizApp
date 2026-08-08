@@ -7,30 +7,87 @@ function RulesPage() {
 
   return (
     <div style={styles.page}>
+      {/* Embedded CSS for perfect Mobile & PC layout */}
+      <style>
+        {`
+          .responsive-header {
+            display: flex;
+            flex-direction: row;
+            gap: 20px;
+            align-items: flex-start;
+            margin-bottom: 14px;
+          }
+          .responsive-image {
+            width: 280px;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            flex-shrink: 0;
+          }
+          .responsive-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+          }
+          .action-btn {
+            min-width: 220px;
+            justify-content: center;
+          }
+          
+          /* Mobile adjustments */
+          @media (max-width: 768px) {
+            .rules-card {
+              padding: 20px 16px !important;
+            }
+            .responsive-header {
+              flex-direction: column-reverse; /* Puts image above text on phones */
+              align-items: center;
+            }
+            .responsive-image {
+              width: 100%;
+              max-width: 250px;
+            }
+            .responsive-buttons {
+              flex-direction: column;
+              width: 100%;
+            }
+            .action-btn {
+              width: 100%;
+            }
+            .intro-text {
+              font-size: 15px !important;
+            }
+          }
+        `}
+      </style>
+
       <div style={styles.bgCircle1} />
       <div style={styles.bgCircle2} />
 
-      <div style={styles.card}>
-        {/* Image on top right – exact path */}
-        <img src="/assets/RulesPic.png" alt="Rules Icon" style={styles.topImage} />
-
-        {/* Introduction */}
-        <div style={styles.introBox}>
-          <p style={styles.introText}>
-            <strong>National Science and Technology Digital Archive (NSTAD)</strong> invites you to participate in
-            an <strong>Online Quiz</strong> based on available archival documents at{" "}
-            <a href="https://nstad.in" target="_blank" rel="noopener noreferrer" style={styles.nstadLink}>
-              nstad.in
-            </a>
-            . <br />
-            <strong>Quiz Date:</strong> 09.08.2026 &nbsp;|&nbsp; <strong>Time:</strong> 21:00 Hrs
-          </p>
-          <p style={styles.introText}>
-            The National Science and Technology Digital Archive (NSTAD) invites science enthusiasts, students,
-            researchers, and the general public to participate in an online quiz celebrating the life, work, and
-            scientific legacy of <strong>Acharya Prafulla Chandra Ray</strong>, one of India's greatest chemists and
-            pioneers of modern scientific research.
-          </p>
+      <div style={styles.card} className="rules-card">
+        
+        {/* Introduction & Image Layout Container */}
+        <div className="responsive-header">
+          <div style={styles.introBox}>
+            <p style={styles.introText} className="intro-text">
+              <strong>National Science and Technology Digital Archive (NSTAD)</strong> invites you to participate in
+              an <strong>Online Quiz</strong> based on available archival documents at{" "}
+              <a href="https://nstad.in" target="_blank" rel="noopener noreferrer" style={styles.nstadLink}>
+                nstad.in
+              </a>
+              . <br />
+              <strong>Quiz Date:</strong> 09.08.2026 &nbsp;|&nbsp; <strong>Time:</strong> 21:00 Hrs
+            </p>
+            <p style={styles.introText} className="intro-text">
+              The National Science and Technology Digital Archive (NSTAD) invites science enthusiasts, students,
+              researchers, and the general public to participate in an online quiz celebrating the life, work, and
+              scientific legacy of <strong>Acharya Prafulla Chandra Ray</strong>, one of India's greatest chemists and
+              p pioneers of modern scientific research.
+            </p>
+          </div>
+          
+          <img src="/assets/RulesPic.png" alt="Rules Icon" className="responsive-image" />
         </div>
 
         {/* Rules – exactly 5 sections */}
@@ -107,8 +164,9 @@ function RulesPage() {
             />
             I have read and agree to all the rules and regulations.
           </label>
-          <div style={styles.buttonGroup}>
+          <div className="responsive-buttons">
             <button
+              className="action-btn"
               style={{
                 ...styles.primaryBtn,
                 opacity: agreed ? 1 : 0.5,
@@ -123,13 +181,16 @@ function RulesPage() {
                 }
               }}
               onMouseLeave={(e) => {
-                e.target.style.transform = "translateY(0)";
-                e.target.style.boxShadow = "0 4px 15px rgba(108, 92, 231, 0.25)";
+                if (agreed) {
+                  e.target.style.transform = "translateY(0)";
+                  e.target.style.boxShadow = "0 4px 15px rgba(108, 92, 231, 0.25)";
+                }
               }}
             >
               📝 Register Now
             </button>
             <button
+              className="action-btn"
               style={{
                 ...styles.secondaryBtn,
                 opacity: agreed ? 1 : 0.5,
@@ -144,8 +205,10 @@ function RulesPage() {
                 }
               }}
               onMouseLeave={(e) => {
-                e.target.style.transform = "translateY(0)";
-                e.target.style.boxShadow = "0 4px 15px rgba(46, 213, 115, 0.25)";
+                if (agreed) {
+                  e.target.style.transform = "translateY(0)";
+                  e.target.style.boxShadow = "0 4px 15px rgba(0,0,0,0.05)";
+                }
               }}
             >
               🔑 Student Login
@@ -207,26 +270,16 @@ const styles = {
     flexDirection: "column",
     overflow: "hidden",
   },
-  topImage: {
-    position: "absolute",
-    top: "20px",
-    right: "20px",
-    width: "350px",
-    height: "auto",
-    borderRadius: "8px",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-  },
   introBox: {
     textAlign: "left",
     backgroundColor: "#f5f3ff",
     padding: "10px 16px",
     borderRadius: "10px",
-    marginBottom: "14px",
     borderLeft: "4px solid #6c5ce7",
-    flexShrink: 0,
+    flex: 1, /* Allows the text box to fill the remaining space next to the image */
   },
   introText: {
-    fontSize: "20px",
+    fontSize: "18px", /* Brought down slightly so it balances well with the image */
     lineHeight: "1.6",
     color: "#2d2d44",
     margin: "4px 0",
@@ -273,11 +326,11 @@ const styles = {
     color: "#333",
   },
   nstadBox: {
-    marginTop: "50px",
+    marginTop: "20px",
     backgroundColor: "#eef2ff",
     borderRadius: "8px",
     padding: "8px 14px",
-    fontSize: "16px",
+    fontSize: "15px",
     color: "#1a237e",
     borderLeft: "4px solid #6c5ce7",
     textAlign: "left",
@@ -290,9 +343,9 @@ const styles = {
   actionGroup: {
     display: "flex",
     flexDirection: "column",
-    gap: "8px",
+    gap: "12px",
     flexShrink: 0,
-    marginTop: "4px",
+    marginTop: "10px",
   },
   checkboxLabel: {
     display: "flex",
@@ -309,18 +362,12 @@ const styles = {
     cursor: "pointer",
     accentColor: "#6c5ce7",
   },
-  buttonGroup: {
-    display: "flex",
-    gap: "12px",
-    justifyContent: "center",
-    flexWrap: "wrap",
-  },
   primaryBtn: {
     display: "inline-flex",
     alignItems: "center",
     gap: "8px",
-    padding: "12px 24px",
-    fontSize: "14px",
+    padding: "14px 24px",
+    fontSize: "15px",
     fontWeight: "700",
     borderRadius: "10px",
     border: "none",
@@ -328,14 +375,14 @@ const styles = {
     color: "#fff",
     boxShadow: "0 4px 15px rgba(108, 92, 231, 0.25)",
     transition: "all 0.25s ease",
-    flexShrink: 0, // prevents stretching
+    flexShrink: 0, 
   },
   secondaryBtn: {
     display: "inline-flex",
     alignItems: "center",
     gap: "8px",
-    padding: "12px 24px",
-    fontSize: "14px",
+    padding: "14px 24px",
+    fontSize: "15px",
     fontWeight: "700",
     borderRadius: "10px",
     border: "2px solid #e0dcee",
@@ -343,6 +390,6 @@ const styles = {
     color: "#4a4a6a",
     boxShadow: "0 4px 15px rgba(0,0,0,0.05)",
     transition: "all 0.25s ease",
-    flexShrink: 0, // prevents stretching
+    flexShrink: 0, 
   },
 };
