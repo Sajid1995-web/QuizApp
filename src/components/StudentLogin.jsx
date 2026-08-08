@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+
+ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./App.css";
 
-const API_BASE = "https://quizappbackend-k09m.onrender.com";
+  const API_BASE = "https://quizappbackend-k09m.onrender.com";
 
 function Login() {
   const navigate = useNavigate();
@@ -25,13 +26,6 @@ function Login() {
 
       const data = await res.json();
 
-      // --- NEW CHECK: Is the quiz already submitted? ---
-      if (data.isQuizSubmitted) {
-        alert("You have already submitted the quiz.");
-        setError(data.message || "You have already submitted the quiz.");
-        return; // Stop execution here
-      }
-
       if (data.success) {
         navigate("/quiz", {
           state: {
@@ -53,7 +47,7 @@ function Login() {
   return (
     <div style={styles.pageWrapper}>
       <div style={styles.card}>
-        <h2 style={styles.title}>🔐 Student Login</h2>
+        <h2 style={styles.title}>🔐Login</h2>
         <form onSubmit={handleLogin} style={styles.form}>
           <div className="form-group">
             <label className="form-label">Registration Number</label>
