@@ -236,64 +236,55 @@ function QuizPage() {
   };
 
   // ---------- Submit quiz ----------
-  const submitQuiz = useCallback(
-    async (auto = false) => {
-      if (submitted) return;
-      if (!auto && !window.confirm("Are you sure you want to submit the quiz?")) return;
-      setSubmitted(true);
-      setSubmitting(true);
-      clearInterval(timerRef.current);
+   const submitQuiz = useCallback(
+  async (auto = false) => {
+    if (submitted) return;
+    if (!auto && !window.confirm("Are you sure you want to submit the quiz?")) return;
+    setSubmitted(true);
+    setSubmitting(true);
+    clearInterval(timerRef.current);
 
-      try {
-        const originalAnswers = new Array(questions.length).fill(null);
-        questions.forEach((q, shuffledIndex) => {
-          originalAnswers[q.originalIndex] = answers[shuffledIndex];
-        });
+    try {
+      const originalAnswers = new Array(questions.length).fill(null);
+      questions.forEach((q, shuffledIndex) => {
+        originalAnswers[q.originalIndex] = answers[shuffledIndex];
+      });
 
-        const res = await fetch(`${API_BASE}/submit-quiz`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            regNo: student.regNo,
-            answers: originalAnswers,
-            auto: auto,
-          }),
-        });
-        const data = await res.json();
-        
-        if (document.fullscreenElement && document.exitFullscreen) {
-            document.exitFullscreen().catch(err => console.log(err));
-        }
-        
-        if (data.disqualified) {
-          setDisqualified(true);
-          setDisqualifiedMessage(data.message || "Time's up! You have been disqualified.");
-          setSubmitting(false);
-        } else {
-          navigate("/result", { state: { ...data, student, totalQuestions: questions.length } });
-        }
-      } catch (err) {
-        alert("Submission failed: " + err.message);
-        setSubmitted(false);
-        setSubmitting(false);
-      } finally {
-        setSubmitting(false);
+      const res = await fetch(`${API_BASE}/submit-quiz`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          regNo: student.regNo,
+          answers: originalAnswers,
+          auto: auto,
+        }),
+      });
+      const data = await res.json();
+
+      if (document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(err => console.log(err));
       }
-    },
-    [questions, answers, student, navigate, submitted]
-  );
 
-  useEffect(() => {
-    submitQuizRef.current = submitQuiz;
-  }, [submitQuiz]);
-
-  const handleTimeExpired = useCallback(() => {
-    if (autoSubmitted.current) return;
-    autoSubmitted.current = true;
-    if (submitQuizRef.current) {
-      submitQuizRef.current(true); 
+      // Always go to result page – it shows the correct UI based on `data.disqualified`
+      navigate("/result", { state: { ...data, student, totalQuestions: questions.length } });
+    } catch (err) {
+      alert("Submission failed: " + err.message);
+      setSubmitted(false);
+      setSubmitting(false);
+    } finally {
+      setSubmitting(false);
     }
-  }, []);
+  },
+  [questions, answers, student, navigate, submitted]
+);
+
+const handleTimeExpired = useCallback(() => {
+  if (autoSubmitted.current) return;
+  autoSubmitted.current = true;
+  if (submitQuizRef.current) {
+    submitQuizRef.current(true); // auto = true → no confirm
+  }
+}, []);
 
   // ---------- View Renders ----------
 
