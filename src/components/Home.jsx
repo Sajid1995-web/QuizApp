@@ -317,7 +317,7 @@ const styles = {
   mainTitle: {
     fontSize: "45px", 
     fontWeight: "800",
-    color: "#1a1a40",
+    color: "#1D526C",
     margin: "0 0 12px 0",
     lineHeight: "1.3",
   },
