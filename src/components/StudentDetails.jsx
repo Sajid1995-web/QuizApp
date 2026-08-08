@@ -217,7 +217,7 @@ function Registration() {
       <div style={styles.card}>
        
 
-        <h2 style={styles.title}>📝 Register for Quiz</h2>
+        <h2 style={styles.title}> Register for Quiz</h2>
         <form onSubmit={handleSubmit} style={styles.form}>
           {/* ---- Hardcoded Name field ---- */}
           <div className="form-group">
