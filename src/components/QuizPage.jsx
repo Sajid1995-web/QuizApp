@@ -16,7 +16,6 @@ function QuizPage() {
   const navigate = useNavigate();
   const { state } = useLocation();
   const student = state?.student;
-  const examStartTime = state?.examStartTime ? new Date(state.examStartTime) : null;
 
   const [questions, setQuestions] = useState([]);
   const [quizReady, setQuizReady] = useState(false);
@@ -32,7 +31,9 @@ function QuizPage() {
   const [disqualified, setDisqualified] = useState(false);
   const [disqualifiedMessage, setDisqualifiedMessage] = useState("");
   const [isLandscape, setIsLandscape] = useState(true);
-  const [isFullscreen, setIsFullscreen] = useState(false); 
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [globalEndTime, setGlobalEndTime] = useState(null);
+  const [globalStartTime, setGlobalStartTime] = useState(null);
 
   const timerRef = useRef(null);
   const autoSubmitted = useRef(false);
@@ -134,14 +135,18 @@ function QuizPage() {
           fetch(`${API_BASE}/servertime`)
         ]);
         
-        const data = await statusRes.json();
+        const statusData = await statusRes.json();
         const timeData = await timeRes.json();
         const serverNow = new Date(timeData.serverTimeUTC);
 
-        if (data.isQuizOpen) {
+        // Store global times
+        setGlobalStartTime(new Date(statusData.startTime));
+        setGlobalEndTime(new Date(statusData.endTime));
+
+        if (statusData.isQuizOpen) {
           setQuizActive(true);
-          // STRICT GLOBAL END TIME SYNC:
-          const serverEnd = new Date(data.endTime);
+          // Calculate remaining time from GLOBAL end time
+          const serverEnd = new Date(statusData.endTime);
           const remainingSecs = Math.max(0, Math.floor((serverEnd - serverNow) / 1000));
           setTimeLeft(remainingSecs);
 
@@ -149,12 +154,12 @@ function QuizPage() {
           if (remainingSecs === 0 && !submitted) {
             handleTimeExpired();
           }
-        } else if (data.hasEnded) {
+        } else if (statusData.hasEnded) {
           alert("The quiz has ended. You cannot take it now.");
           navigate("/login");
         } else {
-          if (data.startTime) {
-            const diff = Math.ceil((new Date(data.startTime) - serverNow) / 1000);
+          if (statusData.startTime) {
+            const diff = Math.ceil((new Date(statusData.startTime) - serverNow) / 1000);
             setWaitTime(diff > 0 ? diff : 0);
           }
         }
@@ -290,7 +295,6 @@ function QuizPage() {
     }
   }, []);
 
-
   // ---------- View Renders ----------
 
   const isMobile = window.innerWidth < 768 || ('ontouchstart' in window);
@@ -343,7 +347,9 @@ function QuizPage() {
   if (!quizActive) {
     const mins = Math.floor((waitTime || 0) / 60);
     const secs = (waitTime || 0) % 60;
-    const startTimeStr = examStartTime ? examStartTime.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" }) : "soon";
+    const startTimeStr = globalStartTime 
+      ? new Date(globalStartTime).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" }) 
+      : "soon";
 
     return (
       <div style={styles.waitContainer}>
@@ -398,11 +404,14 @@ function QuizPage() {
           </div>
         </div>
         <div style={styles.timerSection}>
-          <span style={styles.timerEmoji}> <p style={styles.timerLabel}>Remaining Time</p></span>
-          <span style={{ ...styles.timerText, color: timeLeft <= 60 ? "#dc2626" : "#000" }}>
-            {Math.floor(timeLeft / 60).toString().padStart(2, "0")}:
-            {(timeLeft % 60).toString().padStart(2, "0")}
-          </span>
+          <span style={styles.timerEmoji}>⏱️</span>
+          <div>
+            <p style={styles.timerLabel}>Remaining Time</p>
+            <span style={{ ...styles.timerText, color: timeLeft <= 60 ? "#dc2626" : "#000" }}>
+              {Math.floor(timeLeft / 60).toString().padStart(2, "0")}:
+              {(timeLeft % 60).toString().padStart(2, "0")}
+            </span>
+          </div>
         </div>
         <button onClick={() => submitQuiz(false)} disabled={submitted || timeLeft === 0} style={styles.primaryBtn}>
           Submit Quiz
@@ -524,14 +533,14 @@ const styles = {
     display: "flex", 
     alignItems: "center", 
     justifyContent: "center",
-    gap: "0.75rem", 
+    gap: "0.5rem", 
     backgroundColor: "#f1f5f9", 
     padding: "clamp(0.3rem, 1.5vw, 0.5rem) clamp(1rem, 3vw, 1.5rem)", 
     borderRadius: "60px", 
     border: "1px solid #e5e7eb",
     justifySelf: "center",
   },
-  timerLabel: { fontSize: "clamp(0.9rem, 2vw, 1.2rem)", color: "black", margin: 0 },
+  timerLabel: { fontSize: "clamp(0.7rem, 1.5vw, 0.9rem)", color: "black", margin: 0 },
   timerText: { fontSize: "clamp(1.2rem, 3vw, 1.6rem)", fontWeight: 700, fontVariantNumeric: "tabular-nums" },
   
   // FIXED SUBMIT BUTTON 
