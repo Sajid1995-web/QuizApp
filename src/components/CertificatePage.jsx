@@ -6,69 +6,52 @@ function ResultPage() {
   const navigate = useNavigate();
   const { state } = useLocation();
 
-  const { 
-    student, 
-    disqualified, 
-    totalMarksObtained, 
-    totalMarks, 
-    totalTimeMinutes 
-  } = state || {};
+  const { student, disqualified } = state || {};
 
-  // Handle missing state (e.g., user navigated here directly)
+  // Handle missing state
   if (!state) {
     return (
-      <div style={styles.page}>
-        <div style={{ ...styles.container, maxWidth: 500, padding: 40, textAlign: "center", flexDirection: "column" }}>
-          <h2 style={{ color: "#dc3545", marginBottom: 10 }}>No Data Found</h2>
-          <p style={{ color: "#666", marginBottom: 20 }}>We couldn't find your result data.</p>
-          <button onClick={() => navigate("/login")} style={styles.actionBtn}>
-            Back to Login
-          </button>
-        </div>
+      <div className="page-card">
+        <p>No result data found.</p>
+        <button onClick={() => navigate("/login")}>Back to Login</button>
       </div>
     );
   }
 
-  // Handle Disqualified State (Explicit flag OR -1 marks from backend)
-  if (disqualified || totalMarksObtained === -1) {
+  // Disqualified
+  if (disqualified) {
     return (
-      <div style={styles.page}>
-        <div style={{ ...styles.container, maxWidth: 500, padding: 40, textAlign: "center", flexDirection: "column" }}>
-          <div style={{ fontSize: 60, marginBottom: 10 }}>⏳</div>
-          <h2 style={{ color: "#dc3545", marginBottom: 10 }}>Disqualified</h2>
-          <p style={{ color: "#666", fontSize: "1.1rem", marginBottom: 20 }}>
-            You did not submit the quiz within the allowed time limit, or a violation was detected. Your attempt has been disqualified.
-          </p>
-          <button onClick={() => navigate("/login")} style={styles.actionBtn}>
-            Back to Login
-          </button>
-        </div>
+      <div className="page-card" style={{ maxWidth: 600 }}>
+        <h2 style={{ color: "#dc3545" }}>Disqualified</h2>
+        <p>You did not submit the quiz in time.</p>
+        <button onClick={() => navigate("/")}>Back to Home</button>
       </div>
     );
   }
 
-  // Handle Successful Submission State
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-        {/* Left: Summary Stats */}
+        {/* Left: Custom message */}
         <div style={styles.left}>
-          <h2 style={{ marginBottom: 20 }}>Quiz Completed</h2>
-          <div style={styles.statItem}>
-            <strong>Reg No:</strong> {student?.regNo || "N/A"}
-          </div>
-          <div style={styles.statItem}>
-            <strong>Marks Obtained:</strong>{" "}
-            {totalMarksObtained !== undefined
-              ? `${totalMarksObtained} / ${totalMarks}`
-              : "N/A"}
-          </div>
-          <div style={styles.statItem}>
-            <strong>Time Taken:</strong>{" "}
-            {totalTimeMinutes !== undefined
-              ? `${totalTimeMinutes} min`
-              : "N/A"}
-          </div>
+          <p style={{ fontSize: 16, lineHeight: 1.6, color: "#333" }}>
+            The results will be announced after the evaluation process.
+            Selected participants will be contacted with the contact details
+            provided during registration.
+            <br /><br />
+            Thank you for your participation and look forward to welcoming you
+            for more NSTAD initiatives.
+            <br /><br />
+            Continue exploring India's scientific heritage at:{" "}
+            <a
+              href="https://nstad.in"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: "#007bff", textDecoration: "none" }}
+            >
+              https://nstad.in
+            </a>
+          </p>
         </div>
 
         {/* Right: Confirmation Message */}
@@ -77,11 +60,19 @@ function ResultPage() {
             <div style={{ fontSize: 50, marginBottom: 10 }}>🎉</div>
             <h3 style={{ color: "#28a745" }}>Submission Successful!</h3>
             <p style={{ color: "#666", marginTop: 10 }}>
-              Your answers have been recorded safely.
+              Your answers have been recorded.
             </p>
             <button
               onClick={() => navigate("/")}
-              style={{ ...styles.actionBtn, marginTop: 20 }}
+              style={{
+                marginTop: 20,
+                padding: "10px 20px",
+                backgroundColor: "#007bff",
+                color: "#fff",
+                border: "none",
+                borderRadius: 6,
+                cursor: "pointer",
+              }}
             >
               Back to Home
             </button>
@@ -129,24 +120,8 @@ const styles = {
     justifyContent: "center",
     minHeight: 300,
   },
-  statItem: {
-    fontSize: 16,
-    marginBottom: 12,
-    color: "#333",
-  },
   rankRevealed: {
     textAlign: "center",
     width: "100%",
-  },
-  actionBtn: {
-    padding: "10px 20px",
-    backgroundColor: "#007bff",
-    color: "#fff",
-    border: "none",
-    borderRadius: 6,
-    cursor: "pointer",
-    fontSize: "1rem",
-    fontWeight: "bold",
-    transition: "background 0.2s",
   },
 };
