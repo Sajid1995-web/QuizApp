@@ -1,4 +1,4 @@
-import React from "react";
+ import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "./App.css";
 
@@ -18,17 +18,51 @@ function ResultPage() {
     );
   }
 
-  // Disqualified
+  // ---- DISQUALIFIED: show unified two‑column layout ----
   if (disqualified) {
     return (
-      <div className="page-card" style={{ maxWidth: 600 }}>
-        <h2 style={{ color: "#dc3545" }}>Disqualified</h2>
-        <p>You did not submit the quiz in time.</p>
-        <button onClick={() => navigate("/")}>Back to Home</button>
+      <div style={styles.page}>
+        <div style={styles.container}>
+          {/* Left: Message */}
+          <div style={styles.left}>
+            <p style={{ fontSize: 16, lineHeight: 1.6, color: "#333" }}>
+              You did not submit the quiz in time. As per the rules, you have been
+              disqualified from this quiz.
+              <br /><br />
+              Please ensure you submit your answers before the timer ends in future
+              attempts.
+            </p>
+          </div>
+
+          {/* Right: Disqualified badge */}
+          <div style={styles.right}>
+            <div style={styles.rankRevealed}>
+              <h3 style={{ color: "#dc3545" }}>Disqualified</h3>
+              <p style={{ color: "#666", marginTop: 10 }}>
+                Your submission was not recorded.
+              </p>
+              <button
+                onClick={() => navigate("/")}
+                style={{
+                  marginTop: 20,
+                  padding: "10px 20px",
+                  backgroundColor: "#dc3545",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                }}
+              >
+                Back to Home
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
+  // ---- SUCCESSFUL SUBMISSION (unchanged) ----
   return (
     <div style={styles.page}>
       <div style={styles.container}>
@@ -57,7 +91,6 @@ function ResultPage() {
         {/* Right: Confirmation Message */}
         <div style={styles.right}>
           <div style={styles.rankRevealed}>
-            <div style={{ fontSize: 50, marginBottom: 10 }}>🎉</div>
             <h3 style={{ color: "#28a745" }}>Submission Successful!</h3>
             <p style={{ color: "#666", marginTop: 10 }}>
               Your answers have been recorded.
