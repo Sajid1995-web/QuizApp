@@ -419,11 +419,11 @@ function QuizPage() {
           <span style={styles.profileEmoji}>👤</span>
           <div style={styles.profileDetails}>
             <strong style={{ color: "#000" }}>{displayName}</strong>
-            <span style={{ fontSize: "0.8rem", color: "#000" }}>{student?.regNo}</span>
+            <span style={{ fontSize: "clamp(0.7rem, 1.5vw, 0.8rem)", color: "#000" }}>{student?.regNo}</span>
           </div>
         </div>
         <div style={styles.timerSection}>
-          <span style={styles.timerEmoji}> <p style={{fontSize: "1.6rem", color:"black"}}>Remaining Time</p></span>
+          <span style={styles.timerEmoji}> <p style={styles.timerLabel}>Remaining Time</p></span>
           <span style={{ ...styles.timerText, color: timeLeft <= 60 ? "#dc2626" : "#000" }}>
             {Math.floor(timeLeft / 60).toString().padStart(2, "0")}:
             {(timeLeft % 60).toString().padStart(2, "0")}
@@ -440,7 +440,7 @@ function QuizPage() {
 
       <div style={styles.bodyRow}>
         <div style={styles.mainContent}>
-          <h3 style={{ marginTop: 0, color: "#000" }}>Question {current + 1} of {totalQuestions}</h3>
+          <h3 style={{ marginTop: 0, color: "#000", fontSize: "clamp(1.1rem, 2vw, 1.3rem)" }}>Question {current + 1} of {totalQuestions}</h3>
           <p style={styles.questionText}>{q.question}</p>
           {q.imageUrl && <img src={`${API_BASE}${q.imageUrl}`} alt="Question illustration" style={styles.questionImage} />}
 
@@ -477,7 +477,7 @@ function QuizPage() {
 
         {/* Sidebar */}
         <div style={styles.sidebar}>
-          <h4 style={{ marginTop: 0, marginBottom: "0.5rem", color: "#000" }}>Question Palette</h4>
+          <h4 style={{ marginTop: 0, marginBottom: "0.5rem", color: "#000", fontSize: "clamp(1rem, 2vw, 1.1rem)" }}>Question Palette</h4>
           <div style={styles.paletteGrid}>
             {questions.map((_, idx) => (
               <div
@@ -505,48 +505,67 @@ function QuizPage() {
   );
 }
 
+// 📱 FULLY FLUID & RESPONSIVE CSS IN JS
 const styles = {
   fullscreenOverlay: {
     position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
     backgroundColor: "rgba(0,0,0,0.85)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 99999, backdropFilter: "blur(5px)"
   },
   overlayCard: {
-    backgroundColor: "#ffffff", padding: "2.5rem 3rem", borderRadius: "16px",
+    backgroundColor: "#ffffff", padding: "clamp(1.5rem, 4vw, 2.5rem) clamp(1.5rem, 5vw, 3rem)", borderRadius: "16px",
     textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.15)", maxWidth: 450, width: "90%",
     display: "flex", flexDirection: "column", alignItems: "center"
   },
   rotateIcon: { fontSize: "4rem", marginBottom: "1rem", display: "inline-block", animation: "spin 2s linear infinite" },
   waitContainer: { position: "relative", width: "100%", height: "100vh", backgroundColor: "#f8fafc" },
   overlay: { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.5)", zIndex: 10, display: "flex", justifyContent: "center", alignItems: "center" },
-  countdown: { fontSize: 48, fontWeight: "bold", margin: "15px 0", letterSpacing: 2 },
-  page: { fontFamily: "'Segoe UI', Roboto, system-ui, sans-serif", display: "flex", flexDirection: "column", height: "100vh", backgroundColor: "#f8fafc", userSelect: "none" },
-  topBar: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.75rem 2rem", backgroundColor: "#ffffff", borderBottom: "1px solid #e5e7eb", flexWrap: "wrap", gap: "0.75rem" },
-  profileSection: { display: "flex", alignItems: "center", gap: "0.75rem" },
-  profileEmoji: { fontSize: "1.4rem" },
-  profileDetails: { display: "flex", flexDirection: "column", lineHeight: 1.3, fontSize: "0.95rem" },
+  countdown: { fontSize: "clamp(2rem, 6vw, 3rem)", fontWeight: "bold", margin: "15px 0", letterSpacing: 2 },
   
-  // FIXED BIG TIMER
-  timerSection: { display: "flex", alignItems: "center", gap: "0.75rem", backgroundColor: "#f1f5f9", padding: "0.5rem 1.5rem", borderRadius: "60px", border: "1px solid #e5e7eb" },
-  timerEmoji: { fontSize: "2.6rem" },
-  timerText: { fontSize: "2.6rem", fontWeight: 700, fontVariantNumeric: "tabular-nums" },
+  page: { 
+    fontFamily: "'Segoe UI', Roboto, system-ui, sans-serif", 
+    display: "flex", 
+    flexDirection: "column", 
+    height: "100vh", 
+    backgroundColor: "#f8fafc", 
+    userSelect: "none" 
+  },
   
-   // 1. Change topBar to Grid
+  // DYNAMIC TOP BAR (Wraps perfectly on small screens)
   topBar: { 
-    display: "grid", 
-    gridTemplateColumns: "1fr auto 1fr", // Forces 3 perfect columns
+    display: "flex", 
+    flexWrap: "wrap", // Crucial for mobile responsiveness
+    justifyContent: "space-between", 
     alignItems: "center", 
-    padding: "0.75rem 2rem", 
+    padding: "clamp(0.5rem, 2vw, 0.75rem) clamp(1rem, 4vw, 2rem)", 
     backgroundColor: "#ffffff", 
     borderBottom: "1px solid #e5e7eb", 
     gap: "1rem" 
   },
-
-  // ... (keep your profile and timer styles here) ...
-
-  // 2. Change primaryBtn to look like this (adds justifySelf & width)
+  profileSection: { display: "flex", alignItems: "center", gap: "0.75rem", flex: "1 1 200px" },
+  profileEmoji: { fontSize: "clamp(1.2rem, 3vw, 1.4rem)" },
+  profileDetails: { display: "flex", flexDirection: "column", lineHeight: 1.3, fontSize: "clamp(0.85rem, 2vw, 0.95rem)" },
+  
+  // RESPONSIVE TIMER
+  timerSection: { 
+    display: "flex", 
+    alignItems: "center", 
+    justifyContent: "center",
+    gap: "0.75rem", 
+    backgroundColor: "#f1f5f9", 
+    padding: "clamp(0.3rem, 1.5vw, 0.5rem) clamp(1rem, 3vw, 1.5rem)", 
+    borderRadius: "60px", 
+    border: "1px solid #e5e7eb",
+    flex: "1 1 200px", // Keeps it centered when flexed
+    maxWidth: "max-content",
+    margin: "0 auto"
+  },
+  timerLabel: { fontSize: "clamp(0.9rem, 2vw, 1.2rem)", color: "black", margin: 0 },
+  timerText: { fontSize: "clamp(1.2rem, 3vw, 1.6rem)", fontWeight: 700, fontVariantNumeric: "tabular-nums" },
+  
+  // FIXED SUBMIT BUTTON (No longer massive)
   primaryBtn: { 
-    padding: "0.5rem 1.5rem", 
-    fontSize: "3rem", 
+    padding: "clamp(0.5rem, 2vw, 0.6rem) clamp(1rem, 3vw, 1.5rem)", 
+    fontSize: "clamp(0.9rem, 2vw, 1rem)", // Fixed from 3rem
     fontWeight: 600, 
     backgroundColor: "#0066b3", 
     color: "#fff", 
@@ -554,49 +573,117 @@ const styles = {
     borderRadius: "8px", 
     cursor: "pointer", 
     boxShadow: "0 2px 8px rgba(0, 102, 179, 0.25)",
-    width: "fit-content",       // <-- Stops it from stretching
-    justifySelf: "flex-end"     // <-- Pushes it to the far right corner
+    flex: "1 1 200px",
+    maxWidth: "fit-content",
+    marginLeft: "auto"
   },
   
   progressBarContainer: { height: 4, backgroundColor: "#e5e7eb", width: "100%" },
   progressBar: { height: "100%", backgroundColor: "#0066b3", transition: "width 0.3s ease" },
-  bodyRow: { display: "flex", flex: 1, overflow: "hidden", padding: "1rem", gap: "1rem" },
   
-  // MAIN COLUMN FLEX (Pushes Buttons Down)
-  mainContent: { 
-    flex: 1, padding: "2rem", overflowY: "auto", backgroundColor: "#ffffff", 
-    borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-    display: "flex", flexDirection: "column"
+  // DYNAMIC BODY ROW (Wraps Sidebar on tiny screens)
+  bodyRow: { 
+    display: "flex", 
+    flex: 1, 
+    flexWrap: "wrap", // Pushes Sidebar below on super narrow screens
+    overflowY: "auto", 
+    padding: "clamp(0.5rem, 2vw, 1rem)", 
+    gap: "1rem" 
   },
   
-  questionText: { fontSize: "1.15rem", lineHeight: 1.7, margin: "1rem 0 0.5rem", color: "#000", fontWeight: 500 },
-  questionImage: { maxWidth: "100%", maxHeight: "220px", margin: "0.75rem 0", objectFit: "contain", borderRadius: "8px", border: "1px solid #e5e7eb" },
+  mainContent: { 
+    flex: "1 1 300px", // Grows to fill space but won't shrink below 300px
+    padding: "clamp(1rem, 3vw, 2rem)", 
+    overflowY: "auto", 
+    backgroundColor: "#ffffff", 
+    borderRadius: "12px", 
+    boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+    display: "flex", 
+    flexDirection: "column"
+  },
+  
+  questionText: { fontSize: "clamp(1rem, 2.5vw, 1.15rem)", lineHeight: 1.6, margin: "1rem 0 0.5rem", color: "#000", fontWeight: 500 },
+  questionImage: { maxWidth: "100%", maxHeight: "30vh", margin: "0.75rem 0", objectFit: "contain", borderRadius: "8px", border: "1px solid #e5e7eb" },
   optionsContainer: { display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "0.5rem", margin: "1rem 0 1.5rem" },
-  optionLabel: { display: "inline-flex", alignItems: "center", gap: "0.75rem", padding: "0.4rem 0.8rem", borderRadius: "8px", border: "2px solid #d1d5db", cursor: "pointer", fontSize: "0.95rem", width: "auto", maxWidth: "100%" },
+  optionLabel: { display: "inline-flex", alignItems: "center", gap: "0.75rem", padding: "clamp(0.3rem, 1.5vw, 0.4rem) clamp(0.5rem, 2vw, 0.8rem)", borderRadius: "8px", border: "2px solid #d1d5db", cursor: "pointer", fontSize: "clamp(0.85rem, 2vw, 0.95rem)", width: "auto", maxWidth: "100%" },
   radioInput: { position: "absolute", opacity: 0, width: 0, height: 0, pointerEvents: "none" },
   radioControl: { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 18, height: 18, borderRadius: "50%", border: "2px solid #9ca3af", flexShrink: 0 },
   radioDot: { width: 10, height: 10, borderRadius: "50%", backgroundColor: "transparent", transition: "all 0.2s" },
   radioDotActive: { width: 10, height: 10, borderRadius: "50%", backgroundColor: "#0066b3" },
   optionText: { flex: "0 1 auto", lineHeight: 1.4, color: "#000", whiteSpace: "nowrap" },
   
-  // FIXED BUTTON ROW
+  // RESPONSIVE NAV ROW (Buttons will wrap and stack if squeezed)
   navRow: { 
-    display: "flex", justifyContent: "center", alignItems: "center", gap: "2.5rem",
-    marginTop: "auto", paddingTop: "1.5rem", borderTop: "1px solid #e5e7eb" 
+    display: "flex", 
+    flexWrap: "wrap",
+    justifyContent: "center", 
+    alignItems: "center", 
+    gap: "clamp(0.5rem, 2vw, 2.5rem)",
+    marginTop: "auto", 
+    paddingTop: "1.5rem", 
+    borderTop: "1px solid #e5e7eb" 
   },
   navBtn: { 
-    padding: "0.7rem 2rem", fontSize: "1rem", fontWeight: 600, backgroundColor: "#f1f5f9", 
-    color: "#000", border: "1px solid #d1d5db", borderRadius: "8px", cursor: "pointer", width: "fit-content", minWidth: "140px" 
+    padding: "0.7rem clamp(1rem, 3vw, 2rem)", 
+    fontSize: "clamp(0.85rem, 2vw, 1rem)", 
+    fontWeight: 600, 
+    backgroundColor: "#f1f5f9", 
+    color: "#000", 
+    border: "1px solid #d1d5db", 
+    borderRadius: "8px", 
+    cursor: "pointer", 
+    flex: "1 1 auto", // Allows buttons to squeeze and fill smoothly
+    maxWidth: "200px",
+    minWidth: "100px",
+    textAlign: "center"
   },
   clearBtn: { 
-    padding: "0.7rem 2rem", fontSize: "1rem", fontWeight: 600, backgroundColor: "#fef3c7", 
-    color: "#000", border: "1px solid #fcd34d", borderRadius: "8px", cursor: "pointer", width: "fit-content", minWidth: "140px" 
+    padding: "0.7rem clamp(1rem, 3vw, 2rem)", 
+    fontSize: "clamp(0.85rem, 2vw, 1rem)", 
+    fontWeight: 600, 
+    backgroundColor: "#fef3c7", 
+    color: "#000", 
+    border: "1px solid #fcd34d", 
+    borderRadius: "8px", 
+    cursor: "pointer", 
+    flex: "1 1 auto", 
+    maxWidth: "200px",
+    minWidth: "100px",
+    textAlign: "center"
   },
   
-  sidebar: { width: 220, backgroundColor: "#ffffff", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", padding: "1.2rem 1rem", overflowY: "auto", display: "flex", flexDirection: "column" },
-  paletteGrid: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.5rem", margin: "0.5rem 0 1rem" },
-  paletteItem: { width: "40px", height: "40px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "8px", fontWeight: 600, fontSize: "0.85rem", margin: "0 auto", color: "#000" },
-  sidebarFooter: { borderTop: "1px solid #e5e7eb", paddingTop: "0.75rem", fontSize: "0.85rem", display: "flex", flexDirection: "column", gap: "0.4rem" },
+  sidebar: { 
+    flex: "1 1 200px", // Adapts gracefully alongside main content
+    maxWidth: "100%", // Takes full width if it gets wrapped below
+    backgroundColor: "#ffffff", 
+    borderRadius: "12px", 
+    boxShadow: "0 2px 8px rgba(0,0,0,0.06)", 
+    padding: "clamp(0.8rem, 2vw, 1.2rem) clamp(0.5rem, 2vw, 1rem)", 
+    overflowY: "auto", 
+    display: "flex", 
+    flexDirection: "column" 
+  },
+  // SUPER RESPONSIVE QUESTION PALETTE
+  paletteGrid: { 
+    display: "grid", 
+    gridTemplateColumns: "repeat(auto-fill, minmax(40px, 1fr))", 
+    gap: "0.5rem", 
+    margin: "0.5rem 0 1rem" 
+  },
+  paletteItem: { 
+    width: "100%", 
+    aspectRatio: "1/1",
+    minHeight: "40px",
+    display: "flex", 
+    alignItems: "center", 
+    justifyContent: "center", 
+    borderRadius: "8px", 
+    fontWeight: 600, 
+    fontSize: "0.85rem", 
+    margin: "0 auto", 
+    color: "#000" 
+  },
+  sidebarFooter: { borderTop: "1px solid #e5e7eb", paddingTop: "0.75rem", fontSize: "clamp(0.75rem, 1.5vw, 0.85rem)", display: "flex", flexDirection: "column", gap: "0.4rem" },
   dot: { display: "inline-block", width: 12, height: 12, borderRadius: "50%", marginRight: 6 },
   loadingOverlay: { display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", height: "100vh", backgroundColor: "#f8fafc" },
   spinnerStyle: { margin: "1rem auto", width: 50, height: 50, border: "4px solid #e5e7eb", borderTop: "4px solid #0066b3", borderRadius: "50%", animation: "spin 1s linear infinite" }
