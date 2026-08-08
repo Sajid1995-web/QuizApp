@@ -273,11 +273,11 @@ const styles = {
     color: "#333",
   },
   nstadBox: {
-    marginTop: "10px",
+    marginTop: "50px",
     backgroundColor: "#eef2ff",
     borderRadius: "8px",
     padding: "8px 14px",
-    fontSize: "13px",
+    fontSize: "16px",
     color: "#1a237e",
     borderLeft: "4px solid #6c5ce7",
     textAlign: "left",
