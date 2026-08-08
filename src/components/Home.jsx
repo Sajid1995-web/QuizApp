@@ -13,9 +13,9 @@ function RulesPage() {
           .responsive-header {
             display: flex;
             flex-direction: row;
-            gap: 20px;
+            gap: 24px;
             align-items: flex-start;
-            margin-bottom: 14px;
+            margin-bottom: 20px;
           }
           .responsive-image {
             width: 280px;
@@ -23,15 +23,19 @@ function RulesPage() {
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             flex-shrink: 0;
+            margin-top: 10px;
           }
           .responsive-buttons {
             display: flex;
             gap: 16px;
             justify-content: center;
+            align-items: center; /* Prevents vertical stretching */
             flex-wrap: wrap;
+            margin-top: 8px;
           }
           .action-btn {
             min-width: 220px;
+            height: 50px; /* Locks the button height */
             justify-content: center;
           }
           
@@ -43,10 +47,12 @@ function RulesPage() {
             .responsive-header {
               flex-direction: column-reverse; /* Puts image above text on phones */
               align-items: center;
+              gap: 16px;
             }
             .responsive-image {
               width: 100%;
-              max-width: 250px;
+              max-width: 220px;
+              margin-top: 0;
             }
             .responsive-buttons {
               flex-direction: column;
@@ -55,8 +61,16 @@ function RulesPage() {
             .action-btn {
               width: 100%;
             }
-            .intro-text {
-              font-size: 15px !important;
+            .main-title {
+              font-size: 20px !important;
+              text-align: center;
+            }
+            .sub-title, .desc-text {
+              text-align: center;
+            }
+            .date-badge {
+              display: block !important;
+              text-align: center;
             }
           }
         `}
@@ -70,27 +84,33 @@ function RulesPage() {
         {/* Introduction & Image Layout Container */}
         <div className="responsive-header">
           <div style={styles.introBox}>
-            <p style={styles.introText} className="intro-text">
-              <strong>National Science and Technology Digital Archive (NSTAD)</strong> invites you to participate in
-              an <strong>Online Quiz</strong> based on available archival documents at{" "}
+            <h1 style={styles.mainTitle} className="main-title">
+              National Science and Technology Digital Archive (NSTAD)
+            </h1>
+            
+            <p style={styles.subTitle} className="sub-title">
+              invites you to participate in an <strong style={styles.highlightText}>Online Quiz</strong> based on available archival documents at{" "}
               <a href="https://nstad.in" target="_blank" rel="noopener noreferrer" style={styles.nstadLink}>
                 nstad.in
-              </a>
-              . <br />
-              <strong>Quiz Date:</strong> 09.08.2026 &nbsp;|&nbsp; <strong>Time:</strong> 21:00 Hrs
+              </a>.
             </p>
-            <p style={styles.introText} className="intro-text">
+
+            <div style={styles.dateBadge} className="date-badge">
+              <strong>Quiz Date:</strong> 09.08.2026 &nbsp;|&nbsp; <strong>Time:</strong> 21:00 Hrs
+            </div>
+
+            <p style={styles.descText} className="desc-text">
               The National Science and Technology Digital Archive (NSTAD) invites science enthusiasts, students,
               researchers, and the general public to participate in an online quiz celebrating the life, work, and
               scientific legacy of <strong>Acharya Prafulla Chandra Ray</strong>, one of India's greatest chemists and
-              p pioneers of modern scientific research.
+              pioneers of modern scientific research.
             </p>
           </div>
           
           <img src="/assets/RulesPic.png" alt="Rules Icon" className="responsive-image" />
         </div>
 
-        {/* Rules – exactly 5 sections */}
+        {/* Rules Container */}
         <div style={styles.rulesContainer}>
           <div style={styles.rulesGrid}>
             <div style={styles.ruleCard}>
@@ -273,28 +293,55 @@ const styles = {
   introBox: {
     textAlign: "left",
     backgroundColor: "#f5f3ff",
-    padding: "10px 16px",
-    borderRadius: "10px",
-    borderLeft: "4px solid #6c5ce7",
-    flex: 1, /* Allows the text box to fill the remaining space next to the image */
+    padding: "16px 20px",
+    borderRadius: "12px",
+    borderLeft: "5px solid #6c5ce7",
+    flex: 1,
   },
-  introText: {
-    fontSize: "18px", /* Brought down slightly so it balances well with the image */
-    lineHeight: "1.6",
+  mainTitle: {
+    fontSize: "24px",
+    fontWeight: "800",
+    color: "#1a1a40",
+    margin: "0 0 10px 0",
+    lineHeight: "1.3",
+  },
+  subTitle: {
+    fontSize: "17px",
     color: "#2d2d44",
-    margin: "4px 0",
+    margin: "0 0 12px 0",
+    lineHeight: "1.5",
+  },
+  highlightText: {
+    fontSize: "20px",
+    fontWeight: "800",
+    color: "#6c5ce7",
+  },
+  dateBadge: {
+    display: "inline-block",
+    backgroundColor: "#eef2ff",
+    padding: "8px 16px",
+    borderRadius: "20px",
+    border: "1px solid #dcdde1",
+    color: "#2d3436",
+    fontSize: "15px",
+    margin: "0 0 14px 0",
+  },
+  descText: {
+    fontSize: "14px",
+    lineHeight: "1.6",
+    color: "#4a4a6a",
+    margin: 0,
   },
   rulesContainer: {
     flex: "1 1 auto",
     minHeight: 0,
     overflowY: "auto",
-    marginBottom: "8px",
-    paddingRight: "4px",
+    paddingRight: "6px",
   },
   rulesGrid: {
     display: "flex",
     flexDirection: "column",
-    gap: "8px",
+    gap: "10px",
     textAlign: "left",
   },
   ruleCard: {
@@ -303,7 +350,7 @@ const styles = {
     alignItems: "flex-start",
     backgroundColor: "#faf9ff",
     borderRadius: "10px",
-    padding: "10px 14px",
+    padding: "12px 14px",
     border: "1px solid #eeeafc",
   },
   ruleNumber: {
@@ -314,22 +361,23 @@ const styles = {
     background: "linear-gradient(135deg, #6c5ce7, #a29bfe)",
     color: "#fff",
     fontWeight: "800",
-    fontSize: "13px",
+    fontSize: "14px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
   },
   ruleContent: {
     flex: 1,
-    fontSize: "13px",
+    fontSize: "14px",
     lineHeight: "1.5",
     color: "#333",
   },
   nstadBox: {
-    marginTop: "20px",
+    marginTop: "40px", /* Pushed much further down below the rules */
+    marginBottom: "20px", /* Extra breathing room before the checkbox */
     backgroundColor: "#eef2ff",
     borderRadius: "8px",
-    padding: "8px 14px",
+    padding: "12px 16px",
     fontSize: "15px",
     color: "#1a237e",
     borderLeft: "4px solid #6c5ce7",
@@ -345,20 +393,21 @@ const styles = {
     flexDirection: "column",
     gap: "12px",
     flexShrink: 0,
-    marginTop: "10px",
+    marginTop: "auto", 
   },
   checkboxLabel: {
     display: "flex",
     alignItems: "center",
     gap: "8px",
-    fontSize: "14px",
+    fontSize: "15px",
     color: "#333",
+    fontWeight: "600",
     cursor: "pointer",
     justifyContent: "center",
   },
   checkbox: {
-    width: "18px",
-    height: "18px",
+    width: "20px",
+    height: "20px",
     cursor: "pointer",
     accentColor: "#6c5ce7",
   },
@@ -366,7 +415,7 @@ const styles = {
     display: "inline-flex",
     alignItems: "center",
     gap: "8px",
-    padding: "14px 24px",
+    padding: "0 24px",
     fontSize: "15px",
     fontWeight: "700",
     borderRadius: "10px",
@@ -381,7 +430,7 @@ const styles = {
     display: "inline-flex",
     alignItems: "center",
     gap: "8px",
-    padding: "14px 24px",
+    padding: "0 24px",
     fontSize: "15px",
     fontWeight: "700",
     borderRadius: "10px",
