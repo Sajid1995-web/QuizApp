@@ -211,7 +211,7 @@ const styles = {
     position: "absolute",
     top: "20px",
     right: "20px",
-    width: "300px",
+    width: "1000px",
     height: "auto",
     borderRadius: "8px",
     boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
