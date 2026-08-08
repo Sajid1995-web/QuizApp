@@ -1,4 +1,4 @@
- import React from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
 
 function RulesPage() {
@@ -10,74 +10,100 @@ function RulesPage() {
       <div style={styles.bgCircle2} />
 
       <div style={styles.card}>
+        {/* Image on top right – exact path */}
+        <img src="/assets/RulesPic.png" alt="Rules Icon" style={styles.topImage} />
+
         {/* Back to Home */}
         <button style={styles.backBtn} onClick={() => navigate("/")}>
           ← Back to Home
         </button>
 
         <h1 style={styles.title}>📜 NSTAD Online Quiz – Rules & Regulations</h1>
-        <p style={styles.subtitle}>
-          Please read all rules carefully before starting the quiz.
-        </p>
 
-        {/* Rules List – all content from original */}
+        {/* Introduction – verbatim from the document */}
+        <div style={styles.introBox}>
+          <p style={styles.introText}>
+            <strong>National Science and Technology Digital Archive (NSTAD)</strong> invites you to participate in
+            an <strong>Online Quiz</strong> based on available archival documents at{" "}
+            <a href="https://nstad.in" target="_blank" rel="noopener noreferrer" style={styles.nstadLink}>
+              nstad.in
+            </a>
+            . <br />
+            <strong>Quiz Date:</strong> 09.08.2026 &nbsp;|&nbsp; <strong>Time:</strong> 21:00 Hrs
+          </p>
+          <p style={styles.introText}>
+            The National Science and Technology Digital Archive (NSTAD) invites science enthusiasts, students,
+            researchers, and the general public to participate in an online quiz celebrating the life, work, and
+            scientific legacy of <strong>Acharya Prafulla Chandra Ray</strong>, one of India's greatest chemists and
+            pioneers of modern scientific research.
+          </p>
+        </div>
+
+        {/* Rules List – exactly as per the document (5 sections) */}
         <div style={styles.rulesContainer}>
           <div style={styles.rulesGrid}>
+            {/* 01. Eligibility */}
             <div style={styles.ruleCard}>
               <div style={styles.ruleNumber}>01</div>
               <div style={styles.ruleContent}>
-                <strong>Eligibility:</strong> Open to students of Class XI, Class XII, and Undergraduates from any recognized institution. Participation is free and only one entry per participant.
+                <strong>Eligibility:</strong> The quiz is open to students of Class XI, Class XII, and Undergraduates
+                from any recognized school, college, or university. Participation is free of cost. Each participant is
+                permitted to submit only one entry. Multiple submissions by the same participant may lead to disqualification.
               </div>
             </div>
+
+            {/* 02. Quiz Format */}
             <div style={styles.ruleCard}>
               <div style={{ ...styles.ruleNumber, background: "linear-gradient(135deg, #e17055, #d63031)" }}>02</div>
               <div style={styles.ruleContent}>
-                <strong>Quiz Format:</strong> Multiple-choice questions (MCQs) based on archival documents of Acharya Prafulla Chandra Ray. Explore{" "}
+                <strong>Quiz Format:</strong> The quiz consists of multiple-choice questions (MCQs). Participants are
+                encouraged to explore the collections of scientists pages available on{" "}
                 <a href="https://www.nstad.in" target="_blank" rel="noopener noreferrer" style={{ color: "#6c5ce7", fontWeight: 600 }}>
                   www.nstad.in
                 </a>{" "}
-                beforehand.
+                before attempting the quiz. Participants are encouraged to register themselves on the portal before
+                participation and may enter into the quiz portal by using login credentials. A credential received
+                immediately after registration can be used for participation.
               </div>
             </div>
+
+            {/* 03. Submission Guidelines */}
             <div style={styles.ruleCard}>
               <div style={{ ...styles.ruleNumber, background: "linear-gradient(135deg, #00b894, #00cec9)" }}>03</div>
               <div style={styles.ruleContent}>
-                <strong>Submission Guidelines:</strong> The quiz will be available only on the scheduled date and time. Responses submitted after the closing time will not be considered. Once submitted, answers cannot be changed.
+                <strong>Submission Guidelines:</strong> The quiz will be available only on <strong>9th August, 2026
+                at 21:00 Hrs</strong>. Portal will not allow to participate and enter into the webpage except
+                scheduled time. Duration of the quiz is <strong>10 Minutes</strong> and Questions will be displayed
+                one by one. During the active session participants can change the response. At the end they must
+                submit the responses to register the answer. If not submitted within schedule time, it can be
+                treated as disqualified. Once submitted, responses cannot be edited or resubmitted.
               </div>
             </div>
+
+            {/* 04. Evaluation */}
             <div style={styles.ruleCard}>
               <div style={{ ...styles.ruleNumber, background: "linear-gradient(135deg, #fdcb6e, #e17055)" }}>04</div>
               <div style={styles.ruleContent}>
-                <strong>Time:</strong> 25 MCQs will appear one by one. Duration is 25 minutes – the quiz will automatically close at the end time.
+                <strong>Evaluation:</strong> Each correct answer carries <strong>One mark</strong>. There is negative
+                marking. <strong>One mark will be deducted</strong> for 1 wrong answer. In the event of a tie,
+                participants who submitted their entries fastest will be considered as winner. If required, the
+                organizing committee may apply additional tie‑breaking criteria. Winners will be selected based on
+                the highest scores in accordance with the quiz rules.
               </div>
             </div>
+
+            {/* 05. Disclaimer */}
             <div style={styles.ruleCard}>
               <div style={{ ...styles.ruleNumber, background: "linear-gradient(135deg, #6c5ce7, #a29bfe)" }}>05</div>
               <div style={styles.ruleContent}>
-                <strong>Evaluation:</strong> +1 for each correct answer, <strong>−1</strong> for each wrong answer (negative marking). In case of a tie, earlier submission time gets preference.
-              </div>
-            </div>
-            <div style={styles.ruleCard}>
-              <div style={{ ...styles.ruleNumber, background: "linear-gradient(135deg, #e17055, #fdcb6e)" }}>06</div>
-              <div style={styles.ruleContent}>
-                <strong>Fair Participation:</strong> Answer independently. Unfair means or multiple entries may lead to disqualification. Organizers reserve the right to verify details.
-              </div>
-            </div>
-            <div style={styles.ruleCard}>
-              <div style={{ ...styles.ruleNumber, background: "linear-gradient(135deg, #2d3436, #636e72)" }}>07</div>
-              <div style={styles.ruleContent}>
-                <strong>Results:</strong> Winners are decided by highest score; if tied, faster response time wins. The organizing committee’s decision is final.
-              </div>
-            </div>
-            <div style={styles.ruleCard}>
-              <div style={{ ...styles.ruleNumber, background: "linear-gradient(135deg, #6c5ce7, #5a4bd1)" }}>08</div>
-              <div style={styles.ruleContent}>
-                <strong>Disclaimer:</strong> By participating, you agree to abide by these rules. Organizers are not responsible for poor internet connectivity. No extensions will be granted. The quiz may be modified or cancelled without prior notice.
+                <strong>Disclaimer:</strong> By participating, entrants agree to abide by these Rules &amp; Regulations.
+                The organizers reserve the right to modify, postpone, or cancel the quiz under unforeseen circumstances
+                without prior notice.
               </div>
             </div>
           </div>
 
-          {/* Prominent NSTAD link */}
+          {/* NSTAD link reminder */}
           <div style={styles.nstadBox}>
             📌 Explore the National Science and Technology Digital Archive:{" "}
             <a href="https://www.nstad.in" target="_blank" rel="noopener noreferrer" style={styles.nstadLink}>
@@ -171,6 +197,15 @@ const styles = {
     display: "flex",
     flexDirection: "column",
   },
+  topImage: {
+    position: "absolute",
+    top: "20px",
+    right: "20px",
+    width: "60px",
+    height: "auto",
+    borderRadius: "8px",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+  },
   backBtn: {
     alignSelf: "flex-start",
     background: "none",
@@ -179,7 +214,7 @@ const styles = {
     fontSize: "15px",
     fontWeight: "700",
     cursor: "pointer",
-    marginBottom: "12px",
+    marginBottom: "10px",
     display: "flex",
     alignItems: "center",
     gap: "4px",
@@ -191,15 +226,24 @@ const styles = {
     margin: "0 0 8px",
     letterSpacing: "-0.5px",
   },
-  subtitle: {
-    color: "#5a5a7a",
-    fontSize: "15px",
-    marginBottom: "20px",
+  introBox: {
+    textAlign: "left",
+    backgroundColor: "#f5f3ff",
+    padding: "12px 16px",
+    borderRadius: "10px",
+    marginBottom: "18px",
+    borderLeft: "4px solid #6c5ce7",
+  },
+  introText: {
+    fontSize: "14px",
+    lineHeight: "1.7",
+    color: "#2d2d44",
+    margin: "4px 0",
   },
   rulesContainer: {
     flex: "1 1 auto",
     overflowY: "auto",
-    marginBottom: "20px",
+    marginBottom: "16px",
     paddingRight: "4px",
   },
   rulesGrid: {
@@ -237,10 +281,10 @@ const styles = {
     color: "#333",
   },
   nstadBox: {
-    marginTop: "16px",
+    marginTop: "14px",
     backgroundColor: "#eef2ff",
     borderRadius: "10px",
-    padding: "12px 16px",
+    padding: "10px 16px",
     fontSize: "14px",
     color: "#1a237e",
     borderLeft: "4px solid #6c5ce7",
@@ -256,7 +300,7 @@ const styles = {
     gap: "12px",
     justifyContent: "center",
     flexWrap: "wrap",
-    marginTop: "10px",
+    marginTop: "6px",
   },
   primaryBtn: {
     display: "inline-flex",
