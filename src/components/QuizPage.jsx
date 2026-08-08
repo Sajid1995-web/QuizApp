@@ -38,6 +38,7 @@ function QuizPage() {
   const timerRef = useRef(null);
   const autoSubmitted = useRef(false);
   const submitQuizRef = useRef(null);
+  const statusIntervalRef = useRef(null); // ✅ track polling interval
 
   // ---------- Fullscreen Enforcer ----------
   const enterFullscreen = () => {
@@ -124,6 +125,71 @@ function QuizPage() {
     };
   }, []);
 
+  // ---------- Submit quiz (defined early so it can be used in polling) ----------
+  const submitQuiz = useCallback(
+    async (auto = false) => {
+      if (submitted) return;
+      if (!auto && !window.confirm("Are you sure you want to submit the quiz?")) return;
+      setSubmitted(true);
+      setSubmitting(true);
+      clearInterval(timerRef.current);
+      // ✅ clear status polling to prevent interference
+      if (statusIntervalRef.current) {
+        clearInterval(statusIntervalRef.current);
+        statusIntervalRef.current = null;
+      }
+
+      try {
+        const originalAnswers = new Array(questions.length).fill(null);
+        questions.forEach((q, shuffledIndex) => {
+          originalAnswers[q.originalIndex] = answers[shuffledIndex];
+        });
+
+        const res = await fetch(`${API_BASE}/submit-quiz`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            regNo: student.regNo,
+            answers: originalAnswers,
+            auto: auto,
+          }),
+        });
+        const data = await res.json();
+
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(err => console.log(err));
+        }
+
+        navigate("/result", { state: { ...data, student, totalQuestions: questions.length } });
+      } catch (err) {
+        alert("Submission failed: " + err.message);
+        setSubmitted(false);
+        setSubmitting(false);
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [questions, answers, student, navigate, submitted]
+  );
+
+  useEffect(() => {
+    submitQuizRef.current = submitQuiz;
+  }, [submitQuiz]);
+
+  // ---------- Auto-submit on timer end ----------
+  const handleTimeExpired = useCallback(() => {
+    if (autoSubmitted.current) return;
+    autoSubmitted.current = true;
+    // ✅ clear polling interval to stop further checks
+    if (statusIntervalRef.current) {
+      clearInterval(statusIntervalRef.current);
+      statusIntervalRef.current = null;
+    }
+    if (submitQuizRef.current) {
+      submitQuizRef.current(true);
+    }
+  }, []);
+
   // ---------- Global Server Quiz Status & Timer Polling ----------
   useEffect(() => {
     if (!student) return;
@@ -139,24 +205,24 @@ function QuizPage() {
         const timeData = await timeRes.json();
         const serverNow = new Date(timeData.serverTimeUTC);
 
-        // Store global times
         setGlobalStartTime(new Date(statusData.startTime));
         setGlobalEndTime(new Date(statusData.endTime));
 
         if (statusData.isQuizOpen) {
           setQuizActive(true);
-          // Calculate remaining time from GLOBAL end time
           const serverEnd = new Date(statusData.endTime);
           const remainingSecs = Math.max(0, Math.floor((serverEnd - serverNow) / 1000));
           setTimeLeft(remainingSecs);
 
-          // If global end time is reached, trigger expiration
-          if (remainingSecs === 0 && !submitted) {
+          if (remainingSecs === 0 && !submitted && !autoSubmitted.current) {
             handleTimeExpired();
           }
         } else if (statusData.hasEnded) {
-          alert("The quiz has ended. You cannot take it now.Please register again");
-          navigate("/login");
+          // ✅ Only navigate to login if we are NOT already auto-submitting
+          if (!autoSubmitted.current && !submitting) {
+            alert("The quiz has ended. You cannot take it now. Please register again.");
+            navigate("/login");
+          }
         } else {
           if (statusData.startTime) {
             const diff = Math.ceil((new Date(statusData.startTime) - serverNow) / 1000);
@@ -170,8 +236,15 @@ function QuizPage() {
 
     checkStatus();
     const interval = setInterval(checkStatus, 1000);
-    return () => clearInterval(interval);
-  }, [student, navigate, submitted]);
+    statusIntervalRef.current = interval; // ✅ store interval ref
+
+    return () => {
+      if (statusIntervalRef.current) {
+        clearInterval(statusIntervalRef.current);
+        statusIntervalRef.current = null;
+      }
+    };
+  }, [student, navigate, submitted, submitting, handleTimeExpired]);
 
   // ---------- Fetch questions on active quiz ----------
   useEffect(() => {
@@ -235,59 +308,7 @@ function QuizPage() {
     setAnswers(updated);
   };
 
-  // ---------- Submit quiz ----------
-   const submitQuiz = useCallback(
-  async (auto = false) => {
-    if (submitted) return;
-    if (!auto && !window.confirm("Are you sure you want to submit the quiz?")) return;
-    setSubmitted(true);
-    setSubmitting(true);
-    clearInterval(timerRef.current);
-
-    try {
-      const originalAnswers = new Array(questions.length).fill(null);
-      questions.forEach((q, shuffledIndex) => {
-        originalAnswers[q.originalIndex] = answers[shuffledIndex];
-      });
-
-      const res = await fetch(`${API_BASE}/submit-quiz`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          regNo: student.regNo,
-          answers: originalAnswers,
-          auto: auto,
-        }),
-      });
-      const data = await res.json();
-
-      if (document.fullscreenElement && document.exitFullscreen) {
-        document.exitFullscreen().catch(err => console.log(err));
-      }
-
-      // Always go to result page – it shows the correct UI based on `data.disqualified`
-      navigate("/result", { state: { ...data, student, totalQuestions: questions.length } });
-    } catch (err) {
-      alert("Submission failed: " + err.message);
-      setSubmitted(false);
-      setSubmitting(false);
-    } finally {
-      setSubmitting(false);
-    }
-  },
-  [questions, answers, student, navigate, submitted]
-);
-
-const handleTimeExpired = useCallback(() => {
-  if (autoSubmitted.current) return;
-  autoSubmitted.current = true;
-  if (submitQuizRef.current) {
-    submitQuizRef.current(true); // auto = true → no confirm
-  }
-}, []);
-
   // ---------- View Renders ----------
-
   const isMobile = window.innerWidth < 768 || ('ontouchstart' in window);
 
   if (isMobile && !isLandscape) {
@@ -382,7 +403,6 @@ const handleTimeExpired = useCallback(() => {
   const custom = student?.customData || {};
   const displayName = custom.name || custom.email || student?.regNo || "Student";
 
-  // PREVENT COPY PASTE (Security)
   return (
     <div style={styles.page} onCopy={(e) => e.preventDefault()} onContextMenu={(e) => e.preventDefault()}>
       {/* Top Bar */}
@@ -480,7 +500,7 @@ const handleTimeExpired = useCallback(() => {
   );
 }
 
-// 📱 FULLY FLUID & RESPONSIVE CSS IN JS
+// ---------- Styles (unchanged) ----------
 const styles = {
   fullscreenOverlay: {
     position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
@@ -505,7 +525,6 @@ const styles = {
     userSelect: "none" 
   },
   
-  // DYNAMIC GRID TOP BAR
   topBar: { 
     display: "grid", 
     gridTemplateColumns: "1fr auto 1fr", 
@@ -519,7 +538,6 @@ const styles = {
   profileEmoji: { fontSize: "clamp(1.2rem, 3vw, 1.4rem)" },
   profileDetails: { display: "flex", flexDirection: "column", lineHeight: 1.3, fontSize: "clamp(0.85rem, 2vw, 0.95rem)" },
   
-  // RESPONSIVE TIMER
   timerSection: { 
     display: "flex", 
     alignItems: "center", 
@@ -534,7 +552,6 @@ const styles = {
   timerLabel: { fontSize: "clamp(0.7rem, 1.5vw, 0.9rem)", color: "black", margin: 0 },
   timerText: { fontSize: "clamp(1.2rem, 3vw, 1.6rem)", fontWeight: 700, fontVariantNumeric: "tabular-nums" },
   
-  // FIXED SUBMIT BUTTON 
   primaryBtn: { 
     padding: "clamp(0.5rem, 2vw, 0.6rem) clamp(1rem, 3vw, 1.5rem)", 
     fontSize: "clamp(0.9rem, 2vw, 1rem)", 
@@ -553,24 +570,24 @@ const styles = {
   progressBar: { height: "100%", backgroundColor: "#0066b3", transition: "width 0.3s ease" },
   
   bodyRow: { 
-  display: "flex", 
-  flex: 1, 
-  overflow: "hidden", 
-  padding: "1rem", 
-  gap: "2rem", // Increased gap to push sidebar right
-  justifyContent: "space-between" // This pushes elements apart
-},
+    display: "flex", 
+    flex: 1, 
+    overflow: "hidden", 
+    padding: "1rem", 
+    gap: "2rem",
+    justifyContent: "space-between"
+  },
   mainContent: { 
-  flex: 1, 
-  padding: "2rem", 
-  overflowY: "auto", 
-  backgroundColor: "#ffffff", 
-  borderRadius: "12px", 
-  boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-  display: "flex", 
-  flexDirection: "column",
-  minWidth: 0, // Allows it to shrink if needed
-},
+    flex: 1, 
+    padding: "2rem", 
+    overflowY: "auto", 
+    backgroundColor: "#ffffff", 
+    borderRadius: "12px", 
+    boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+    display: "flex", 
+    flexDirection: "column",
+    minWidth: 0,
+  },
   
   questionText: { fontSize: "clamp(1rem, 2.5vw, 1.15rem)", lineHeight: 1.6, margin: "1rem 0 0.5rem", color: "#000", fontWeight: 500 },
   questionImage: { maxWidth: "100%", maxHeight: "30vh", margin: "0.75rem 0", objectFit: "contain", borderRadius: "8px", border: "1px solid #e5e7eb" },
@@ -621,45 +638,38 @@ const styles = {
     textAlign: "center"
   },
   
- // Replace the bodyRow style
-
-
-// Replace the sidebar style - make it smaller
-sidebar: { 
-  width: 180, // Reduced from 220 to 180
-  minWidth: 150, // Minimum width
-  maxWidth: 200, // Maximum width
-  backgroundColor: "#ffffff", 
-  borderRadius: "12px", 
-  boxShadow: "0 2px 8px rgba(0,0,0,0.06)", 
-  padding: "1rem 0.8rem", // Reduced padding
-  overflowY: "auto", 
-  display: "flex", 
-  flexDirection: "column",
-  marginLeft: "auto", // Pushes it to the right
-  flexShrink: 0 // Prevents it from shrinking
-},
-
-// Make palette items smaller
-paletteGrid: { 
-  display: "grid", 
-  gridTemplateColumns: "repeat(4, 1fr)", 
-  gap: "0.4rem", // Reduced gap
-  margin: "0.5rem 0 0.8rem" 
-},
-
-paletteItem: { 
-  width: "35px", // Reduced from 40px
-  height: "35px", // Reduced from 40px
-  display: "flex", 
-  alignItems: "center", 
-  justifyContent: "center", 
-  borderRadius: "8px", 
-  fontWeight: 600, 
-  fontSize: "0.8rem", // Smaller font
-  margin: "0 auto", 
-  color: "#000" 
-},
+  sidebar: { 
+    width: 180,
+    minWidth: 150,
+    maxWidth: 200,
+    backgroundColor: "#ffffff", 
+    borderRadius: "12px", 
+    boxShadow: "0 2px 8px rgba(0,0,0,0.06)", 
+    padding: "1rem 0.8rem",
+    overflowY: "auto", 
+    display: "flex", 
+    flexDirection: "column",
+    marginLeft: "auto",
+    flexShrink: 0
+  },
+  paletteGrid: { 
+    display: "grid", 
+    gridTemplateColumns: "repeat(4, 1fr)", 
+    gap: "0.4rem",
+    margin: "0.5rem 0 0.8rem" 
+  },
+  paletteItem: { 
+    width: "35px",
+    height: "35px",
+    display: "flex", 
+    alignItems: "center", 
+    justifyContent: "center", 
+    borderRadius: "8px", 
+    fontWeight: 600, 
+    fontSize: "0.8rem",
+    margin: "0 auto", 
+    color: "#000" 
+  },
   sidebarFooter: { borderTop: "1px solid #e5e7eb", paddingTop: "0.75rem", fontSize: "clamp(0.75rem, 1.5vw, 0.85rem)", display: "flex", flexDirection: "column", gap: "0.4rem" },
   dot: { display: "inline-block", width: 12, height: 12, borderRadius: "50%", marginRight: 6 },
   loadingOverlay: { display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", height: "100vh", backgroundColor: "#f8fafc" },
