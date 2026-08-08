@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 const API_BASE = "https://quizappbackend-k09m.onrender.com";
 
+// ---------- Utility: Fisher–Yates shuffle ----------
 const shuffleArray = (array) => {
   const newArray = [...array];
   for (let i = newArray.length - 1; i > 0; i--) {
@@ -16,35 +17,34 @@ function QuizPage() {
   const navigate = useNavigate();
   const { state } = useLocation();
   const student = state?.student;
+  const examStartTime = state?.examStartTime ? new Date(state.examStartTime) : null;
+  const examDuration = state?.examDuration || 30;
 
   const [questions, setQuestions] = useState([]);
   const [quizReady, setQuizReady] = useState(false);
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState([]);
-  const [timeLeft, setTimeLeft] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(examDuration * 60);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [quizActive, setQuizActive] = useState(false);
   const [waitTime, setWaitTime] = useState(null);
   const [loadingQuestions, setLoadingQuestions] = useState(true);
   const [questionsError, setQuestionsError] = useState(null);
-  const [disqualified, setDisqualified] = useState(false);
-  const [disqualifiedMessage, setDisqualifiedMessage] = useState("");
   const [isLandscape, setIsLandscape] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [globalEndTime, setGlobalEndTime] = useState(null);
-  const [globalStartTime, setGlobalStartTime] = useState(null);
 
   const timerRef = useRef(null);
   const autoSubmitted = useRef(false);
   const submitQuizRef = useRef(null);
-  const statusIntervalRef = useRef(null); // ✅ track polling interval
+  const timerInitialized = useRef(false);
+  const statusIntervalRef = useRef(null);
 
   // ---------- Fullscreen Enforcer ----------
   const enterFullscreen = () => {
     const elem = document.documentElement;
     if (elem.requestFullscreen) {
-      elem.requestFullscreen().catch(err => console.error(err));
+      elem.requestFullscreen().catch((err) => console.error(err));
     } else if (elem.webkitRequestFullscreen) {
       elem.webkitRequestFullscreen();
     } else if (elem.msRequestFullscreen) {
@@ -81,25 +81,6 @@ function QuizPage() {
     if (!student) navigate("/login");
   }, [student, navigate]);
 
-  // Check disqualification on load
-  useEffect(() => {
-    if (!student) return;
-    const checkDisqualification = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/my-rank?regNo=${student.regNo}`);
-        const data = await res.json();
-        if (data.success && data.disqualified) {
-          setDisqualified(true);
-          setDisqualifiedMessage("You have been disqualified.");
-          setQuizActive(false);
-        }
-      } catch (err) {
-        console.debug("Disqualification check skipped:", err.message);
-      }
-    };
-    checkDisqualification();
-  }, [student]);
-
   // ---------- Orientation enforcement ----------
   useEffect(() => {
     const checkOrientation = () => {
@@ -107,7 +88,6 @@ function QuizPage() {
         window.matchMedia("(orientation: landscape)").matches ||
         (window.screen?.orientation?.type?.startsWith("landscape") ?? false) ||
         window.innerWidth > window.innerHeight;
-
       setIsLandscape(isLandscapeNow);
     };
 
@@ -116,16 +96,120 @@ function QuizPage() {
 
     window.addEventListener("orientationchange", handleChange);
     window.addEventListener("resize", handleChange);
-    if (window.screen?.orientation) window.screen.orientation.addEventListener("change", handleChange);
+    if (window.screen?.orientation) {
+      window.screen.orientation.addEventListener("change", handleChange);
+    }
 
     return () => {
       window.removeEventListener("orientationchange", handleChange);
       window.removeEventListener("resize", handleChange);
-      if (window.screen?.orientation) window.screen.orientation.removeEventListener("change", handleChange);
+      if (window.screen?.orientation) {
+        window.screen.orientation.removeEventListener("change", handleChange);
+      }
     };
   }, []);
 
-  // ---------- Submit quiz (defined early so it can be used in polling) ----------
+  // ---------- Quiz status polling ----------
+  useEffect(() => {
+    if (quizActive || !student) return;
+
+    const checkStatus = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/quiz-status`);
+        const data = await res.json();
+
+        if (data.isQuizOpen) {
+          if (!timerInitialized.current) {
+            const end = new Date(data.endTime);
+            const now = new Date();
+            let remaining = Math.floor((end - now) / 1000);
+            if (remaining < 0) remaining = 0;
+            setTimeLeft(remaining);
+            timerInitialized.current = true;
+          }
+          setQuizActive(true);
+        } else if (data.hasEnded) {
+          // Only navigate if we are not already auto-submitting
+          if (!autoSubmitted.current && !submitting) {
+            alert("The quiz has ended. You cannot take it now. Please register again.");
+            navigate("/login");
+          }
+        } else {
+          if (examStartTime) {
+            const diff = Math.ceil((new Date(data.startTime) - new Date()) / 1000);
+            setWaitTime(diff > 0 ? diff : 0);
+          }
+        }
+      } catch (err) {
+        console.error("Status check error:", err);
+      }
+    };
+
+    checkStatus();
+    const interval = setInterval(checkStatus, 1000);
+    statusIntervalRef.current = interval;
+    return () => clearInterval(interval);
+  }, [quizActive, student, navigate, examStartTime, submitting]);
+
+  // ---------- Fetch questions ----------
+  useEffect(() => {
+    if (!quizActive) return;
+
+    const fetchQuestions = async () => {
+      setLoadingQuestions(true);
+      setQuizReady(false);
+      setQuestionsError(null);
+
+      try {
+        await fetch(`${API_BASE}/start-quiz`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ regNo: student.regNo }),
+        });
+
+        const res = await fetch(`${API_BASE}/get-questions`);
+        const data = await res.json();
+
+        if (!data.success) throw new Error(data.message);
+
+        const withIndex = data.questions.map((q, idx) => ({
+          ...q,
+          originalIndex: idx,
+        }));
+
+        const shuffled = shuffleArray(withIndex);
+
+        setQuestions(shuffled);
+        setAnswers(new Array(shuffled.length).fill(null));
+        setQuizReady(true);
+      } catch (err) {
+        setQuestionsError(err.message);
+      } finally {
+        setLoadingQuestions(false);
+      }
+    };
+
+    fetchQuestions();
+  }, [quizActive, student.regNo]);
+
+  // ---------- Navigation ----------
+  const goTo = (idx) => {
+    if (idx >= 0 && idx < questions.length) setCurrent(idx);
+  };
+
+  const selectAnswer = (key) => {
+    const updated = [...answers];
+    updated[current] = key;
+    setAnswers(updated);
+  };
+
+  const clearAnswer = () => {
+    const updated = [...answers];
+    updated[current] = null;
+    setAnswers(updated);
+  };
+
+  // ---------- Submit quiz ----------
   const submitQuiz = useCallback(
     async (auto = false) => {
       if (submitted) return;
@@ -133,7 +217,7 @@ function QuizPage() {
       setSubmitted(true);
       setSubmitting(true);
       clearInterval(timerRef.current);
-      // ✅ clear status polling to prevent interference
+      // Clear status polling to prevent interference
       if (statusIntervalRef.current) {
         clearInterval(statusIntervalRef.current);
         statusIntervalRef.current = null;
@@ -156,11 +240,18 @@ function QuizPage() {
         });
         const data = await res.json();
 
-        if (document.fullscreenElement && document.exitFullscreen) {
-          document.exitFullscreen().catch(err => console.log(err));
+        // Force disqualification if auto-submit and time is up (backup safety)
+        if (auto && timeLeft === 0) {
+          data.disqualified = true;
         }
 
-        navigate("/result", { state: { ...data, student, totalQuestions: questions.length } });
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch((err) => console.log(err));
+        }
+
+        navigate("/result", {
+          state: { ...data, student, totalQuestions: questions.length },
+        });
       } catch (err) {
         alert("Submission failed: " + err.message);
         setSubmitted(false);
@@ -169,9 +260,10 @@ function QuizPage() {
         setSubmitting(false);
       }
     },
-    [questions, answers, student, navigate, submitted]
+    [questions, answers, student, navigate, submitted, timeLeft]
   );
 
+  // Keep ref updated
   useEffect(() => {
     submitQuizRef.current = submitQuiz;
   }, [submitQuiz]);
@@ -180,7 +272,7 @@ function QuizPage() {
   const handleTimeExpired = useCallback(() => {
     if (autoSubmitted.current) return;
     autoSubmitted.current = true;
-    // ✅ clear polling interval to stop further checks
+    // Clear status polling to prevent alert interference
     if (statusIntervalRef.current) {
       clearInterval(statusIntervalRef.current);
       statusIntervalRef.current = null;
@@ -190,147 +282,54 @@ function QuizPage() {
     }
   }, []);
 
-  // ---------- Global Server Quiz Status & Timer Polling ----------
+  // ---------- Timer effect ----------
   useEffect(() => {
-    if (!student) return;
+    if (!quizActive || submitted || questions.length === 0) return;
 
-    const checkStatus = async () => {
-      try {
-        const [statusRes, timeRes] = await Promise.all([
-          fetch(`${API_BASE}/quiz-status`),
-          fetch(`${API_BASE}/servertime`)
-        ]);
-        
-        const statusData = await statusRes.json();
-        const timeData = await timeRes.json();
-        const serverNow = new Date(timeData.serverTimeUTC);
-
-        setGlobalStartTime(new Date(statusData.startTime));
-        setGlobalEndTime(new Date(statusData.endTime));
-
-        if (statusData.isQuizOpen) {
-          setQuizActive(true);
-          const serverEnd = new Date(statusData.endTime);
-          const remainingSecs = Math.max(0, Math.floor((serverEnd - serverNow) / 1000));
-          setTimeLeft(remainingSecs);
-
-          if (remainingSecs === 0 && !submitted && !autoSubmitted.current) {
-            handleTimeExpired();
-          }
-        } else if (statusData.hasEnded) {
-          // ✅ Only navigate to login if we are NOT already auto-submitting
-          if (!autoSubmitted.current && !submitting) {
-            alert("The quiz has ended. You cannot take it now. Please register again.");
-            navigate("/login");
-          }
-        } else {
-          if (statusData.startTime) {
-            const diff = Math.ceil((new Date(statusData.startTime) - serverNow) / 1000);
-            setWaitTime(diff > 0 ? diff : 0);
-          }
+    timerRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current);
+          handleTimeExpired();
+          return 0;
         }
-      } catch (err) {
-        console.error("Status check error:", err);
-      }
-    };
+        return prev - 1;
+      });
+    }, 1000);
 
-    checkStatus();
-    const interval = setInterval(checkStatus, 1000);
-    statusIntervalRef.current = interval; // ✅ store interval ref
+    return () => clearInterval(timerRef.current);
+  }, [quizActive, submitted, questions.length, handleTimeExpired]);
 
-    return () => {
-      if (statusIntervalRef.current) {
-        clearInterval(statusIntervalRef.current);
-        statusIntervalRef.current = null;
-      }
-    };
-  }, [student, navigate, submitted, submitting, handleTimeExpired]);
+  // ---------- Determine mobile ----------
+  const isMobile = window.innerWidth < 768 || "ontouchstart" in window;
 
-  // ---------- Fetch questions on active quiz ----------
-  useEffect(() => {
-    if (!quizActive) return;
-
-    const fetchQuestions = async () => {
-      setLoadingQuestions(true);
-      setQuizReady(false);
-      setQuestionsError(null);
-
-      try {
-        const startRes = await fetch(`${API_BASE}/start-quiz`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ regNo: student.regNo }),
-        });
-        const startData = await startRes.json();
-
-        if (startRes.status === 403 && startData.message.includes("submitted")) {
-            alert(startData.message);
-            navigate("/login");
-            return;
-        }
-
-        if (!startData.success) throw new Error(startData.message);
-
-        const res = await fetch(`${API_BASE}/get-questions`);
-        const data = await res.json();
-        if (!data.success) throw new Error(data.message);
-
-        const withIndex = data.questions.map((q, idx) => ({ ...q, originalIndex: idx }));
-        const shuffled = shuffleArray(withIndex);
-
-        setQuestions(shuffled);
-        setAnswers(new Array(shuffled.length).fill(null));
-        setQuizReady(true);
-      } catch (err) {
-        setQuestionsError(err.message);
-      } finally {
-        setLoadingQuestions(false);
-      }
-    };
-
-    fetchQuestions();
-  }, [quizActive, student.regNo, navigate]);
-
-  // ---------- Navigation ----------
-  const goTo = (idx) => {
-    if (idx >= 0 && idx < questions.length) setCurrent(idx);
-  };
-
-  const selectAnswer = (key) => {
-    const updated = [...answers];
-    updated[current] = key;
-    setAnswers(updated);
-  };
-
-  const clearAnswer = () => {
-    const updated = [...answers];
-    updated[current] = null;
-    setAnswers(updated);
-  };
-
-  // ---------- View Renders ----------
-  const isMobile = window.innerWidth < 768 || ('ontouchstart' in window);
-
+  // ---------- Landscape overlay ----------
   if (isMobile && !isLandscape) {
     return (
-      <div style={styles.fullscreenOverlay}>
-        <div style={styles.overlayCard}>
+      <div style={styles.landscapeOverlay}>
+        <div style={styles.landscapeContent}>
           <div style={styles.rotateIcon}>📱↻</div>
           <h2 style={{ color: "#000" }}>Please rotate your device</h2>
-          <p style={{ color: "#000" }}>This quiz must be taken in <strong>landscape</strong> mode.</p>
+          <p style={{ color: "#000" }}>
+            This quiz must be taken in <strong>landscape</strong> mode.
+          </p>
+          <p style={{ color: "#000", fontSize: "0.9rem" }}>
+            Turn your phone sideways to continue.
+          </p>
         </div>
       </div>
     );
   }
 
-  // 🚨 FULLSCREEN BLOCKER 🚨
-  if (quizActive && quizReady && !isFullscreen && !disqualified && !submitted) {
+  // ---------- Fullscreen blocker ----------
+  if (quizActive && quizReady && !isFullscreen && !submitted) {
     return (
       <div style={styles.fullscreenOverlay}>
         <div style={styles.overlayCard}>
           <h2 style={{ color: "#dc2626" }}>⚠️ Fullscreen Required</h2>
           <p style={{ color: "#000", margin: "1rem 0" }}>
-            You must be in fullscreen mode to take this exam. Leaving fullscreen may result in disqualification.
+            You must be in fullscreen mode to take this exam. Leaving fullscreen
+            may result in disqualification.
           </p>
           <button onClick={enterFullscreen} style={styles.primaryBtn}>
             Enter Fullscreen
@@ -340,37 +339,59 @@ function QuizPage() {
     );
   }
 
-  if (disqualified) {
-    return (
-      <div style={styles.waitContainer}>
-        <div style={styles.overlay}>
-          <div style={{ ...styles.overlayCard, border: "3px solid #dc2626" }}>
-            <h2 style={{ color: "#dc2626" }}>⛔ {disqualifiedMessage || "You have been disqualified"}</h2>
-            <p style={{ color: "#000", margin: "1rem 0" }}>You cannot continue with this quiz.</p>
-            <button onClick={() => navigate("/login")} style={styles.primaryBtn}>
-              Go to Login
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+  // ---------- Waiting screen ----------
   if (!quizActive) {
     const mins = Math.floor((waitTime || 0) / 60);
     const secs = (waitTime || 0) % 60;
-    const startTimeStr = globalStartTime 
-      ? new Date(globalStartTime).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" }) 
+    const startTimeStr = examStartTime
+      ? examStartTime.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" })
       : "soon";
 
     return (
       <div style={styles.waitContainer}>
         <div style={styles.overlay}>
-          <div style={styles.overlayCard}>
+          <div style={styles.warningCard}>
             <h2 style={{ color: "#000" }}>🔒 Exam not started yet</h2>
-            <p style={{ color: "#000", margin: "1rem 0" }}>Scheduled start at <strong>{startTimeStr}</strong> IST</p>
+            <p style={{ color: "#000" }}>
+              Scheduled start at <strong>{startTimeStr}</strong> IST
+            </p>
             <div style={{ ...styles.countdown, color: "#0066b3" }}>
               {mins.toString().padStart(2, "0")}:{secs.toString().padStart(2, "0")}
+            </div>
+            <p style={{ color: "#000" }}>
+              The page will refresh automatically when the exam begins.
+            </p>
+          </div>
+        </div>
+        <div style={styles.blurredQuiz}>
+          <div style={styles.fakeHeader}>
+            <div style={styles.fakeLogo}></div>
+            <div style={styles.fakeStudent}>
+              <div style={styles.fakeLine}></div>
+              <div style={{ ...styles.fakeLine, width: "70%" }}></div>
+            </div>
+            <div style={styles.fakeTimer}></div>
+          </div>
+          <div style={styles.fakeBody}>
+            <div style={styles.fakeQuestionCard}>
+              <div style={{ ...styles.fakeLine, width: "85%", height: 24 }}></div>
+              <div style={{ height: 30 }} />
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} style={styles.fakeOption}>
+                  <div style={styles.fakeRadio}></div>
+                  <div style={{ ...styles.fakeLine, flex: 1 }}></div>
+                </div>
+              ))}
+              <div style={{ height: 30 }} />
+              <div style={styles.fakeButtons}>
+                <div style={styles.fakeButton}></div>
+                <div style={styles.fakeButton}></div>
+              </div>
+            </div>
+            <div style={styles.fakeSidebar}>
+              {Array.from({ length: 25 }).map((_, i) => (
+                <div key={i} style={styles.fakePalette}></div>
+              ))}
             </div>
           </div>
         </div>
@@ -378,11 +399,48 @@ function QuizPage() {
     );
   }
 
+  // ---------- Loading / error / submitting ----------
   if (loadingQuestions || !quizReady) {
     return (
       <div style={styles.loadingOverlay}>
-        <div className="spinner" style={styles.spinnerStyle} />
+        <div
+          className="spinner"
+          style={{
+            margin: "1rem auto",
+            width: 50,
+            height: 50,
+            border: "4px solid #e5e7eb",
+            borderTop: "4px solid #0066b3",
+            borderRadius: "50%",
+            animation: "spin 1s linear infinite",
+          }}
+        />
         <h2 style={{ color: "#000" }}>Loading Questions...</h2>
+        <p style={{ color: "#000" }}>Please wait</p>
+      </div>
+    );
+  }
+
+  if (questionsError) {
+    return (
+      <div style={styles.loadingOverlay}>
+        <h2 style={{ color: "#dc2626" }}>⚠️ Error loading questions</h2>
+        <p style={{ color: "#000" }}>{questionsError}</p>
+        <button
+          className="btn"
+          onClick={() => window.location.reload()}
+          style={{
+            marginTop: "1rem",
+            padding: "0.5rem 1.5rem",
+            backgroundColor: "#0066b3",
+            color: "#fff",
+            border: "none",
+            borderRadius: "8px",
+            cursor: "pointer",
+          }}
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -390,54 +448,123 @@ function QuizPage() {
   if (submitting) {
     return (
       <div style={styles.loadingOverlay}>
-        <div className="spinner" style={styles.spinnerStyle} />
-        <h2 style={{ color: "#000" }}>{disqualified ? "Disqualified" : "Calculating your result..."}</h2>
+        <div
+          className="spinner"
+          style={{
+            margin: "1rem auto",
+            width: 50,
+            height: 50,
+            border: "4px solid #e5e7eb",
+            borderTop: "4px solid #0066b3",
+            borderRadius: "50%",
+            animation: "spin 1s linear infinite",
+          }}
+        />
+        <h2 style={{ color: "#000" }}>Calculating your result...</h2>
+        <p style={{ color: "#000" }}>Please wait</p>
+      </div>
+    );
+  }
+
+  if (!questions.length) {
+    return (
+      <div style={styles.loadingOverlay}>
+        <h2 style={{ color: "#000" }}>No questions available</h2>
+        <button
+          className="btn"
+          onClick={() => window.location.reload()}
+          style={{
+            marginTop: "1rem",
+            padding: "0.5rem 1.5rem",
+            backgroundColor: "#0066b3",
+            color: "#fff",
+            border: "none",
+            borderRadius: "8px",
+            cursor: "pointer",
+          }}
+        >
+          Retry
+        </button>
       </div>
     );
   }
 
   const q = questions[current];
+  if (!q) {
+    return (
+      <div style={styles.loadingOverlay}>
+        <div className="spinner" />
+        <h2>Preparing Exam...</h2>
+      </div>
+    );
+  }
+
   const attemptedCount = answers.filter((a) => a !== null).length;
   const totalQuestions = questions.length;
   const progress = ((current + 1) / totalQuestions) * 100;
+
   const custom = student?.customData || {};
   const displayName = custom.name || custom.email || student?.regNo || "Student";
 
   return (
-    <div style={styles.page} onCopy={(e) => e.preventDefault()} onContextMenu={(e) => e.preventDefault()}>
+    <div style={styles.page}>
       {/* Top Bar */}
       <div style={styles.topBar}>
         <div style={styles.profileSection}>
           <span style={styles.profileEmoji}>👤</span>
           <div style={styles.profileDetails}>
             <strong style={{ color: "#000" }}>{displayName}</strong>
-            <span style={{ fontSize: "clamp(0.7rem, 1.5vw, 0.8rem)", color: "#000" }}>{student?.regNo}</span>
-          </div>
-        </div>
-        <div style={styles.timerSection}>
-          <span style={styles.timerEmoji}>⏱️</span>
-          <div>
-            <p style={styles.timerLabel}>Remaining Time</p>
-            <span style={{ ...styles.timerText, color: timeLeft <= 60 ? "#dc2626" : "#000" }}>
-              {Math.floor(timeLeft / 60).toString().padStart(2, "0")}:
-              {(timeLeft % 60).toString().padStart(2, "0")}
+            <span style={{ fontSize: "0.8rem", color: "#000" }}>
+              {student?.regNo}
+              {custom.email && ` • ${custom.email}`}
             </span>
           </div>
         </div>
-        <button onClick={() => submitQuiz(false)} disabled={submitted || timeLeft === 0} style={styles.primaryBtn}>
+        <div style={styles.timerSection}>
+          <span style={styles.timerEmoji}>⏳</span>
+          <span
+            style={{
+              ...styles.timerText,
+              color: timeLeft <= 60 ? "#dc2626" : "#000",
+            }}
+          >
+            {Math.floor(timeLeft / 60)
+              .toString()
+              .padStart(2, "0")}
+            :
+            {(timeLeft % 60).toString().padStart(2, "0")}
+          </span>
+        </div>
+        <button
+          onClick={() => submitQuiz(false)}
+          disabled={submitted || timeLeft === 0}
+          style={styles.submitBtn}
+        >
           Submit Quiz
         </button>
       </div>
 
+      {/* Progress Bar */}
       <div style={styles.progressBarContainer}>
         <div style={{ ...styles.progressBar, width: `${progress}%` }} />
       </div>
 
       <div style={styles.bodyRow}>
+        {/* Main Content */}
         <div style={styles.mainContent}>
-          <h3 style={{ marginTop: 0, color: "#000", fontSize: "clamp(1.1rem, 2vw, 1.3rem)" }}>Question {current + 1} of {totalQuestions}</h3>
+          <h3 style={{ marginTop: 0, color: "#000" }}>
+            Question {current + 1} of {totalQuestions}
+          </h3>
+
           <p style={styles.questionText}>{q.question}</p>
-          {q.imageUrl && <img src={`${API_BASE}${q.imageUrl}`} alt="Question illustration" style={styles.questionImage} />}
+
+          {q.imageUrl && (
+            <img
+              src={`${API_BASE}${q.imageUrl}`}
+              alt="Question illustration"
+              style={styles.questionImage}
+            />
+          )}
 
           <div style={styles.optionsContainer}>
             {Object.entries(q.options).map(([key, val]) => {
@@ -451,12 +578,26 @@ function QuizPage() {
                     borderColor: isSelected ? "#0066b3" : "#d1d5db",
                   }}
                 >
-                  <input type="radio" name={`question-${current}`} value={key} checked={isSelected} onChange={() => selectAnswer(key)} style={styles.radioInput} />
+                  <input
+                    type="radio"
+                    name={`question-${current}`}
+                    value={key}
+                    checked={isSelected}
+                    onChange={() => selectAnswer(key)}
+                    style={styles.radioInput}
+                  />
                   <span style={styles.radioControl}>
-                    <span style={isSelected ? styles.radioDotActive : styles.radioDot} />
+                    <span
+                      style={
+                        isSelected
+                          ? styles.radioDotActive
+                          : styles.radioDot
+                      }
+                    />
                   </span>
                   <span style={styles.optionText}>
-                    <b style={{ color: "#000" }}>{key}.</b> <span style={{ color: "#000" }}>{val}</span>
+                    <b style={{ color: "#000" }}>{key}.</b>{" "}
+                    <span style={{ color: "#000" }}>{val}</span>
                   </span>
                 </label>
               );
@@ -464,35 +605,79 @@ function QuizPage() {
           </div>
 
           <div style={styles.navRow}>
-            <button style={styles.navBtn} onClick={() => goTo(current - 1)} disabled={current === 0}>← Previous</button>
-            <button style={styles.clearBtn} onClick={clearAnswer}>Clear Answer</button>
-            <button style={styles.navBtn} onClick={() => goTo(current + 1)} disabled={current === questions.length - 1}>Next →</button>
+            <button
+              style={styles.navBtn}
+              onClick={() => goTo(current - 1)}
+              disabled={current === 0}
+            >
+              ← Previous
+            </button>
+            <button style={styles.clearBtn} onClick={clearAnswer}>
+              Clear Answer
+            </button>
+            <button
+              style={styles.navBtn}
+              onClick={() => goTo(current + 1)}
+              disabled={current === questions.length - 1}
+            >
+              Next →
+            </button>
           </div>
         </div>
 
         {/* Sidebar */}
         <div style={styles.sidebar}>
-          <h4 style={{ marginTop: 0, marginBottom: "0.5rem", color: "#000", fontSize: "clamp(1rem, 2vw, 1.1rem)" }}>Question Palette</h4>
+          <h4 style={{ marginTop: 0, marginBottom: "0.5rem", color: "#000" }}>
+            Question Palette
+          </h4>
           <div style={styles.paletteGrid}>
-            {questions.map((_, idx) => (
-              <div
-                key={idx}
-                onClick={() => goTo(idx)}
-                style={{
-                  ...styles.paletteItem,
-                  backgroundColor: answers[idx] !== null ? "#22c55e" : "#f3f4f6",
-                  color: answers[idx] !== null ? "#fff" : "#000",
-                  border: idx === current ? "3px solid #0066b3" : "2px solid transparent",
-                  cursor: "pointer",
-                }}
-              >
-                {idx + 1}
-              </div>
-            ))}
+            {questions.map((_, idx) => {
+              const isAttempted = answers[idx] !== null;
+              const isCurrent = idx === current;
+
+              let bg, color;
+              if (isAttempted) {
+                bg = "#22c55e";
+                color = "#fff";
+              } else {
+                bg = "#f3f4f6";
+                color = "#000";
+              }
+
+              return (
+                <div
+                  key={idx}
+                  onClick={() => goTo(idx)}
+                  style={{
+                    ...styles.paletteItem,
+                    backgroundColor: bg,
+                    color: color,
+                    border: isCurrent
+                      ? "3px solid #0066b3"
+                      : "2px solid transparent",
+                    cursor: "pointer",
+                  }}
+                >
+                  {idx + 1}
+                </div>
+              );
+            })}
           </div>
           <div style={styles.sidebarFooter}>
-            <div style={{ color: "#000" }}><span style={{ ...styles.dot, background: "#22c55e" }} /> Attempted: {attemptedCount}</div>
-            <div style={{ color: "#000" }}><span style={{ ...styles.dot, background: "#f3f4f6", border: "1px solid #d1d5db" }} /> Unattempted: {totalQuestions - attemptedCount}</div>
+            <div style={{ color: "#000" }}>
+              <span style={{ ...styles.dot, background: "#22c55e" }} />{" "}
+              Attempted: {attemptedCount}
+            </div>
+            <div style={{ color: "#000" }}>
+              <span
+                style={{
+                  ...styles.dot,
+                  background: "#f3f4f6",
+                  border: "1px solid #d1d5db",
+                }}
+              />{" "}
+              Unattempted: {totalQuestions - attemptedCount}
+            </div>
           </div>
         </div>
       </div>
@@ -500,184 +685,470 @@ function QuizPage() {
   );
 }
 
-// ---------- Styles (unchanged) ----------
+// ---------- Styles ----------
 const styles = {
   fullscreenOverlay: {
-    position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
-    backgroundColor: "rgba(0,0,0,0.85)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 99999, backdropFilter: "blur(5px)"
+    position: "fixed",
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+    backgroundColor: "rgba(0,0,0,0.85)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 99999,
+    backdropFilter: "blur(5px)",
   },
   overlayCard: {
-    backgroundColor: "#ffffff", padding: "clamp(1.5rem, 4vw, 2.5rem) clamp(1.5rem, 5vw, 3rem)", borderRadius: "16px",
-    textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.15)", maxWidth: 450, width: "90%",
-    display: "flex", flexDirection: "column", alignItems: "center"
+    backgroundColor: "#ffffff",
+    padding: "clamp(1.5rem, 4vw, 2.5rem) clamp(1.5rem, 5vw, 3rem)",
+    borderRadius: "16px",
+    textAlign: "center",
+    boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+    maxWidth: 450,
+    width: "90%",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
   },
-  rotateIcon: { fontSize: "4rem", marginBottom: "1rem", display: "inline-block", animation: "spin 2s linear infinite" },
-  waitContainer: { position: "relative", width: "100%", height: "100vh", backgroundColor: "#f8fafc" },
-  overlay: { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.5)", zIndex: 10, display: "flex", justifyContent: "center", alignItems: "center" },
-  countdown: { fontSize: "clamp(2rem, 6vw, 3rem)", fontWeight: "bold", margin: "15px 0", letterSpacing: 2 },
-  
-  page: { 
-    fontFamily: "'Segoe UI', Roboto, system-ui, sans-serif", 
-    display: "flex", 
-    flexDirection: "column", 
-    height: "100vh", 
-    backgroundColor: "#f8fafc", 
-    userSelect: "none" 
-  },
-  
-  topBar: { 
-    display: "grid", 
-    gridTemplateColumns: "1fr auto 1fr", 
-    alignItems: "center", 
-    padding: "clamp(0.5rem, 2vw, 0.75rem) clamp(1rem, 4vw, 2rem)", 
-    backgroundColor: "#ffffff", 
-    borderBottom: "1px solid #e5e7eb", 
-    gap: "1rem" 
-  },
-  profileSection: { display: "flex", alignItems: "center", gap: "0.75rem", justifySelf: "flex-start" },
-  profileEmoji: { fontSize: "clamp(1.2rem, 3vw, 1.4rem)" },
-  profileDetails: { display: "flex", flexDirection: "column", lineHeight: 1.3, fontSize: "clamp(0.85rem, 2vw, 0.95rem)" },
-  
-  timerSection: { 
-    display: "flex", 
-    alignItems: "center", 
+  landscapeOverlay: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#f8fafc",
+    display: "flex",
     justifyContent: "center",
-    gap: "0.5rem", 
-    backgroundColor: "#f1f5f9", 
-    padding: "clamp(0.3rem, 1.5vw, 0.5rem) clamp(1rem, 3vw, 1.5rem)", 
-    borderRadius: "60px", 
-    border: "1px solid #e5e7eb",
-    justifySelf: "center",
+    alignItems: "center",
+    zIndex: 9999,
   },
-  timerLabel: { fontSize: "clamp(0.7rem, 1.5vw, 0.9rem)", color: "black", margin: 0 },
-  timerText: { fontSize: "clamp(1.2rem, 3vw, 1.6rem)", fontWeight: 700, fontVariantNumeric: "tabular-nums" },
-  
-  primaryBtn: { 
-    padding: "clamp(0.5rem, 2vw, 0.6rem) clamp(1rem, 3vw, 1.5rem)", 
-    fontSize: "clamp(0.9rem, 2vw, 1rem)", 
-    fontWeight: 600, 
-    backgroundColor: "#0066b3", 
-    color: "#fff", 
-    border: "none", 
-    borderRadius: "8px", 
-    cursor: "pointer", 
+  landscapeContent: {
+    textAlign: "center",
+    padding: "2rem",
+    maxWidth: 400,
+  },
+  rotateIcon: {
+    fontSize: "4rem",
+    marginBottom: "1rem",
+    display: "inline-block",
+    animation: "spin 2s linear infinite",
+  },
+  waitContainer: {
+    position: "relative",
+    width: "100%",
+    height: "100vh",
+    overflow: "hidden",
+    backgroundColor: "#f8fafc",
+  },
+  overlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+    backgroundColor: "rgba(0,0,0,0.5)",
+    zIndex: 10,
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  warningCard: {
+    backgroundColor: "#ffffff",
+    padding: "2.5rem 3rem",
+    borderRadius: "16px",
+    textAlign: "center",
+    boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+    maxWidth: 450,
+    width: "90%",
+  },
+  countdown: {
+    fontSize: 48,
+    fontWeight: "bold",
+    margin: "15px 0",
+    letterSpacing: 2,
+  },
+  blurredQuiz: {
+    filter: "blur(6px)",
+    opacity: 0.5,
+    pointerEvents: "none",
+    height: "100%",
+    display: "flex",
+    flexDirection: "column",
+  },
+  page: {
+    fontFamily: "'Segoe UI', Roboto, system-ui, sans-serif",
+    display: "flex",
+    flexDirection: "column",
+    height: "100vh",
+    backgroundColor: "#f8fafc",
+  },
+  topBar: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "0.75rem 2rem",
+    backgroundColor: "#ffffff",
+    borderBottom: "1px solid #e5e7eb",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+    flexWrap: "wrap",
+    gap: "0.75rem",
+  },
+  profileSection: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.75rem",
+  },
+  profileEmoji: { fontSize: "1.4rem" },
+  profileDetails: {
+    display: "flex",
+    flexDirection: "column",
+    lineHeight: 1.3,
+    fontSize: "0.95rem",
+    color: "#000",
+  },
+  timerSection: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    backgroundColor: "#f1f5f9",
+    padding: "0.3rem 1rem",
+    borderRadius: "30px",
+    border: "1px solid #e5e7eb",
+  },
+  timerEmoji: { fontSize: "1.2rem" },
+  timerText: {
+    fontSize: "1.2rem",
+    fontWeight: 700,
+    fontVariantNumeric: "tabular-nums",
+    color: "#000",
+  },
+  primaryBtn: {
+    padding: "clamp(0.5rem, 2vw, 0.6rem) clamp(1rem, 3vw, 1.5rem)",
+    fontSize: "clamp(0.9rem, 2vw, 1rem)",
+    fontWeight: 600,
+    backgroundColor: "#0066b3",
+    color: "#fff",
+    border: "none",
+    borderRadius: "8px",
+    cursor: "pointer",
     boxShadow: "0 2px 8px rgba(0, 102, 179, 0.25)",
     width: "fit-content",
-    justifySelf: "flex-end" 
+    justifySelf: "flex-end",
   },
-  
-  progressBarContainer: { height: 4, backgroundColor: "#e5e7eb", width: "100%" },
-  progressBar: { height: "100%", backgroundColor: "#0066b3", transition: "width 0.3s ease" },
-  
-  bodyRow: { 
-    display: "flex", 
-    flex: 1, 
-    overflow: "hidden", 
-    padding: "1rem", 
-    gap: "2rem",
-    justifyContent: "space-between"
+  submitBtn: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "0.3rem 1.2rem",
+    fontSize: "0.9rem",
+    fontWeight: 600,
+    backgroundColor: "#0066b3",
+    color: "#fff",
+    border: "none",
+    borderRadius: "30px",
+    cursor: "pointer",
+    transition: "all 0.2s",
+    boxShadow: "0 2px 8px rgba(0, 102, 179, 0.25)",
+    flex: "0 0 auto",
+    width: "auto",
+    whiteSpace: "nowrap",
   },
-  mainContent: { 
-    flex: 1, 
-    padding: "2rem", 
-    overflowY: "auto", 
-    backgroundColor: "#ffffff", 
-    borderRadius: "12px", 
+  progressBarContainer: {
+    height: 4,
+    backgroundColor: "#e5e7eb",
+    width: "100%",
+  },
+  progressBar: {
+    height: "100%",
+    backgroundColor: "#0066b3",
+    transition: "width 0.3s ease",
+  },
+  bodyRow: {
+    display: "flex",
+    flex: 1,
+    overflow: "hidden",
+    padding: "1rem",
+    gap: "1rem",
+  },
+  mainContent: {
+    flex: 1,
+    padding: "1.5rem 2rem",
+    overflowY: "auto",
+    backgroundColor: "#ffffff",
+    borderRadius: "12px",
     boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-    display: "flex", 
-    flexDirection: "column",
-    minWidth: 0,
   },
-  
-  questionText: { fontSize: "clamp(1rem, 2.5vw, 1.15rem)", lineHeight: 1.6, margin: "1rem 0 0.5rem", color: "#000", fontWeight: 500 },
-  questionImage: { maxWidth: "100%", maxHeight: "30vh", margin: "0.75rem 0", objectFit: "contain", borderRadius: "8px", border: "1px solid #e5e7eb" },
-  optionsContainer: { display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "0.5rem", margin: "1rem 0 1.5rem" },
-  optionLabel: { display: "inline-flex", alignItems: "center", gap: "0.75rem", padding: "clamp(0.3rem, 1.5vw, 0.4rem) clamp(0.5rem, 2vw, 0.8rem)", borderRadius: "8px", border: "2px solid #d1d5db", cursor: "pointer", fontSize: "clamp(0.85rem, 2vw, 0.95rem)", width: "auto", maxWidth: "100%" },
-  radioInput: { position: "absolute", opacity: 0, width: 0, height: 0, pointerEvents: "none" },
-  radioControl: { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 18, height: 18, borderRadius: "50%", border: "2px solid #9ca3af", flexShrink: 0 },
-  radioDot: { width: 10, height: 10, borderRadius: "50%", backgroundColor: "transparent", transition: "all 0.2s" },
-  radioDotActive: { width: 10, height: 10, borderRadius: "50%", backgroundColor: "#0066b3" },
-  optionText: { flex: "0 1 auto", lineHeight: 1.4, color: "#000", whiteSpace: "nowrap" },
-  
-  navRow: { 
-    display: "flex", 
+  questionText: {
+    fontSize: "1.15rem",
+    lineHeight: 1.7,
+    margin: "1rem 0 0.5rem",
+    color: "#000",
+    fontWeight: 500,
+  },
+  questionImage: {
+    maxWidth: "100%",
+    maxHeight: "220px",
+    margin: "0.75rem 0",
+    objectFit: "contain",
+    borderRadius: "8px",
+    border: "1px solid #e5e7eb",
+  },
+  optionsContainer: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: "0.5rem",
+    margin: "1rem 0 1.5rem",
+  },
+  optionLabel: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "0.75rem",
+    padding: "0.4rem 0.8rem",
+    borderRadius: "8px",
+    border: "2px solid #d1d5db",
+    cursor: "pointer",
+    transition: "all 0.15s ease",
+    fontSize: "0.95rem",
+    color: "#000",
+    backgroundColor: "#ffffff",
+    width: "auto",
+    maxWidth: "100%",
+    boxSizing: "border-box",
+  },
+  radioInput: {
+    position: "absolute",
+    opacity: 0,
+    width: 0,
+    height: 0,
+    pointerEvents: "none",
+  },
+  radioControl: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 18,
+    height: 18,
+    borderRadius: "50%",
+    border: "2px solid #9ca3af",
+    flexShrink: 0,
+    transition: "all 0.2s",
+  },
+  radioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: "50%",
+    backgroundColor: "transparent",
+    transition: "all 0.2s",
+  },
+  radioDotActive: {
+    width: 10,
+    height: 10,
+    borderRadius: "50%",
+    backgroundColor: "#0066b3",
+  },
+  optionText: {
+    flex: "0 1 auto",
+    lineHeight: 1.4,
+    color: "#000",
+    whiteSpace: "nowrap",
+  },
+  navRow: {
+    display: "flex",
     flexWrap: "wrap",
-    justifyContent: "center", 
-    alignItems: "center", 
-    gap: "clamp(0.5rem, 2vw, 2.5rem)",
-    marginTop: "auto", 
-    paddingTop: "1.5rem", 
-    borderTop: "1px solid #e5e7eb" 
+    justifyContent: "center",
+    alignItems: "center",
+    gap: "0.6rem",
+    marginTop: "1.5rem",
   },
-  navBtn: { 
-    padding: "0.7rem clamp(1rem, 3vw, 2rem)", 
-    fontSize: "clamp(0.85rem, 2vw, 1rem)", 
-    fontWeight: 600, 
-    backgroundColor: "#f1f5f9", 
-    color: "#000", 
-    border: "1px solid #d1d5db", 
-    borderRadius: "8px", 
-    cursor: "pointer", 
-    flex: "1 1 auto", 
-    maxWidth: "200px",
-    minWidth: "100px",
-    textAlign: "center"
+  navBtn: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "0.3rem 0.9rem",
+    fontSize: "0.85rem",
+    fontWeight: 500,
+    backgroundColor: "#f1f5f9",
+    color: "#000",
+    border: "1px solid #d1d5db",
+    borderRadius: "30px",
+    cursor: "pointer",
+    transition: "all 0.2s",
+    flex: "0 0 auto",
+    width: "auto",
+    whiteSpace: "nowrap",
   },
-  clearBtn: { 
-    padding: "0.7rem clamp(1rem, 3vw, 2rem)", 
-    fontSize: "clamp(0.85rem, 2vw, 1rem)", 
-    fontWeight: 600, 
-    backgroundColor: "#fef3c7", 
-    color: "#000", 
-    border: "1px solid #fcd34d", 
-    borderRadius: "8px", 
-    cursor: "pointer", 
-    flex: "1 1 auto", 
-    maxWidth: "200px",
-    minWidth: "100px",
-    textAlign: "center"
+  clearBtn: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "0.3rem 0.9rem",
+    fontSize: "0.85rem",
+    fontWeight: 500,
+    backgroundColor: "#fef3c7",
+    color: "#000",
+    border: "1px solid #fcd34d",
+    borderRadius: "30px",
+    cursor: "pointer",
+    transition: "all 0.2s",
+    flex: "0 0 auto",
+    width: "auto",
+    whiteSpace: "nowrap",
   },
-  
-  sidebar: { 
-    width: 180,
-    minWidth: 150,
-    maxWidth: 200,
-    backgroundColor: "#ffffff", 
-    borderRadius: "12px", 
-    boxShadow: "0 2px 8px rgba(0,0,0,0.06)", 
-    padding: "1rem 0.8rem",
-    overflowY: "auto", 
-    display: "flex", 
+  sidebar: {
+    width: 220,
+    backgroundColor: "#ffffff",
+    borderRadius: "12px",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+    padding: "1.2rem 1rem",
+    overflowY: "auto",
+    display: "flex",
     flexDirection: "column",
-    marginLeft: "auto",
-    flexShrink: 0
   },
-  paletteGrid: { 
-    display: "grid", 
-    gridTemplateColumns: "repeat(4, 1fr)", 
+  paletteGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(4, 1fr)",
+    gap: "0.5rem",
+    margin: "0.5rem 0 1rem",
+  },
+  paletteItem: {
+    width: "40px",
+    height: "40px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "8px",
+    fontWeight: 600,
+    fontSize: "0.85rem",
+    margin: "0 auto",
+    transition: "all 0.15s ease",
+    color: "#000",
+  },
+  sidebarFooter: {
+    borderTop: "1px solid #e5e7eb",
+    paddingTop: "0.75rem",
+    fontSize: "0.85rem",
+    display: "flex",
+    flexDirection: "column",
     gap: "0.4rem",
-    margin: "0.5rem 0 0.8rem" 
+    color: "#000",
   },
-  paletteItem: { 
-    width: "35px",
-    height: "35px",
-    display: "flex", 
-    alignItems: "center", 
-    justifyContent: "center", 
-    borderRadius: "8px", 
-    fontWeight: 600, 
-    fontSize: "0.8rem",
-    margin: "0 auto", 
-    color: "#000" 
+  dot: {
+    display: "inline-block",
+    width: 12,
+    height: 12,
+    borderRadius: "50%",
+    marginRight: 6,
   },
-  sidebarFooter: { borderTop: "1px solid #e5e7eb", paddingTop: "0.75rem", fontSize: "clamp(0.75rem, 1.5vw, 0.85rem)", display: "flex", flexDirection: "column", gap: "0.4rem" },
-  dot: { display: "inline-block", width: 12, height: 12, borderRadius: "50%", marginRight: 6 },
-  loadingOverlay: { display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", height: "100vh", backgroundColor: "#f8fafc" },
-  spinnerStyle: { margin: "1rem auto", width: 50, height: 50, border: "4px solid #e5e7eb", borderTop: "4px solid #0066b3", borderRadius: "50%", animation: "spin 1s linear infinite" }
+  loadingOverlay: {
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+    height: "100vh",
+    fontFamily: "'Segoe UI', Roboto, system-ui, sans-serif",
+    backgroundColor: "#f8fafc",
+  },
+  blurredQuiz: {
+    position: "absolute",
+    inset: 0,
+    background: "#f5f7fb",
+    filter: "blur(8px)",
+    transform: "scale(1.04)",
+    opacity: 0.9,
+    zIndex: 0,
+    overflow: "hidden",
+  },
+  fakeHeader: {
+    height: 70,
+    background: "#ffffff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "0 30px",
+    borderBottom: "1px solid #ddd",
+  },
+  fakeLogo: {
+    width: 180,
+    height: 28,
+    borderRadius: 6,
+    background: "#d8dce6",
+  },
+  fakeStudent: {
+    width: 250,
+  },
+  fakeTimer: {
+    width: 80,
+    height: 40,
+    borderRadius: 8,
+    background: "#d8dce6",
+  },
+  fakeBody: {
+    display: "flex",
+    padding: 30,
+    gap: 30,
+  },
+  fakeQuestionCard: {
+    flex: 1,
+    background: "#fff",
+    borderRadius: 14,
+    padding: 30,
+    boxShadow: "0 8px 30px rgba(0,0,0,.08)",
+  },
+  fakeSidebar: {
+    width: 240,
+    background: "#fff",
+    borderRadius: 14,
+    padding: 20,
+    display: "grid",
+    gridTemplateColumns: "repeat(5,1fr)",
+    gap: 12,
+  },
+  fakePalette: {
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+    background: "#d8dce6",
+  },
+  fakeLine: {
+    height: 18,
+    background: "#d8dce6",
+    borderRadius: 10,
+  },
+  fakeOption: {
+    display: "flex",
+    alignItems: "center",
+    gap: 15,
+    marginBottom: 18,
+  },
+  fakeRadio: {
+    width: 20,
+    height: 20,
+    borderRadius: "50%",
+    background: "#d8dce6",
+  },
+  fakeButtons: {
+    display: "flex",
+    justifyContent: "space-between",
+  },
+  fakeButton: {
+    width: 120,
+    height: 42,
+    borderRadius: 8,
+    background: "#d8dce6",
+  },
 };
 
+// Inject spinner animation globally
 const styleSheet = document.createElement("style");
-styleSheet.textContent = `@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`;
+styleSheet.textContent = `
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+`;
 document.head.appendChild(styleSheet);
 
 export default QuizPage;
