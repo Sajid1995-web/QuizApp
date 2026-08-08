@@ -14,8 +14,8 @@ function RulesPage() {
             display: flex;
             flex-direction: row;
             gap: 24px;
-            align-items: flex-start;
-            margin-bottom: 20px;
+            align-items: center; /* Centers the image with the text vertically */
+            margin-bottom: 24px;
           }
           .responsive-image {
             width: 280px;
@@ -23,20 +23,23 @@ function RulesPage() {
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             flex-shrink: 0;
-            margin-top: 10px;
           }
           .responsive-buttons {
             display: flex;
+            flex-direction: row;
             gap: 16px;
             justify-content: center;
             align-items: center; /* Prevents vertical stretching */
             flex-wrap: wrap;
             margin-top: 8px;
+            width: 100%;
           }
           .action-btn {
             min-width: 220px;
             height: 50px; /* Locks the button height */
+            display: flex;
             justify-content: center;
+            align-items: center;
           }
           
           /* Mobile adjustments */
@@ -47,30 +50,25 @@ function RulesPage() {
             .responsive-header {
               flex-direction: column-reverse; /* Puts image above text on phones */
               align-items: center;
-              gap: 16px;
+              gap: 20px;
             }
             .responsive-image {
               width: 100%;
-              max-width: 220px;
-              margin-top: 0;
+              max-width: 240px;
             }
             .responsive-buttons {
-              flex-direction: column;
-              width: 100%;
+              flex-direction: column; /* Stack on mobile */
+              align-items: center;
             }
             .action-btn {
               width: 100%;
+              max-width: 300px; /* Prevents them from being ridiculously wide on tablets */
             }
             .main-title {
-              font-size: 20px !important;
-              text-align: center;
+              font-size: 22px !important;
             }
-            .sub-title, .desc-text {
-              text-align: center;
-            }
-            .date-badge {
-              display: block !important;
-              text-align: center;
+            .sub-title {
+              font-size: 17px !important;
             }
           }
         `}
@@ -95,11 +93,11 @@ function RulesPage() {
               </a>.
             </p>
 
-            <div style={styles.dateBadge} className="date-badge">
+            <div style={styles.dateBadge}>
               <strong>Quiz Date:</strong> 09.08.2026 &nbsp;|&nbsp; <strong>Time:</strong> 21:00 Hrs
             </div>
 
-            <p style={styles.descText} className="desc-text">
+            <p style={styles.descText}>
               The National Science and Technology Digital Archive (NSTAD) invites science enthusiasts, students,
               researchers, and the general public to participate in an online quiz celebrating the life, work, and
               scientific legacy of <strong>Acharya Prafulla Chandra Ray</strong>, one of India's greatest chemists and
@@ -291,43 +289,46 @@ const styles = {
     overflow: "hidden",
   },
   introBox: {
-    textAlign: "left",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center", /* Centers items horizontally */
+    textAlign: "center", /* Centers text alignment */
     backgroundColor: "#f5f3ff",
-    padding: "16px 20px",
+    padding: "20px 24px",
     borderRadius: "12px",
-    borderLeft: "5px solid #6c5ce7",
+    borderTop: "5px solid #6c5ce7", /* Moved accent line to the top for center symmetry */
     flex: 1,
   },
   mainTitle: {
-    fontSize: "24px",
+    fontSize: "26px", /* Increased size */
     fontWeight: "800",
     color: "#1a1a40",
-    margin: "0 0 10px 0",
+    margin: "0 0 12px 0",
     lineHeight: "1.3",
   },
   subTitle: {
-    fontSize: "17px",
+    fontSize: "19px", /* Increased size */
     color: "#2d2d44",
-    margin: "0 0 12px 0",
+    margin: "0 0 16px 0",
     lineHeight: "1.5",
   },
   highlightText: {
-    fontSize: "20px",
+    fontSize: "22px", /* Increased size */
     fontWeight: "800",
     color: "#6c5ce7",
   },
   dateBadge: {
     display: "inline-block",
     backgroundColor: "#eef2ff",
-    padding: "8px 16px",
-    borderRadius: "20px",
+    padding: "10px 20px",
+    borderRadius: "25px",
     border: "1px solid #dcdde1",
     color: "#2d3436",
-    fontSize: "15px",
-    margin: "0 0 14px 0",
+    fontSize: "16px",
+    margin: "0 0 18px 0",
   },
   descText: {
-    fontSize: "14px",
+    fontSize: "16px", /* Increased size */
     lineHeight: "1.6",
     color: "#4a4a6a",
     margin: 0,
@@ -373,8 +374,8 @@ const styles = {
     color: "#333",
   },
   nstadBox: {
-    marginTop: "40px", /* Pushed much further down below the rules */
-    marginBottom: "20px", /* Extra breathing room before the checkbox */
+    marginTop: "40px",
+    marginBottom: "20px",
     backgroundColor: "#eef2ff",
     borderRadius: "8px",
     padding: "12px 16px",
@@ -412,11 +413,8 @@ const styles = {
     accentColor: "#6c5ce7",
   },
   primaryBtn: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "8px",
     padding: "0 24px",
-    fontSize: "15px",
+    fontSize: "16px",
     fontWeight: "700",
     borderRadius: "10px",
     border: "none",
@@ -424,14 +422,10 @@ const styles = {
     color: "#fff",
     boxShadow: "0 4px 15px rgba(108, 92, 231, 0.25)",
     transition: "all 0.25s ease",
-    flexShrink: 0, 
   },
   secondaryBtn: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "8px",
     padding: "0 24px",
-    fontSize: "15px",
+    fontSize: "16px",
     fontWeight: "700",
     borderRadius: "10px",
     border: "2px solid #e0dcee",
@@ -439,6 +433,5 @@ const styles = {
     color: "#4a4a6a",
     boxShadow: "0 4px 15px rgba(0,0,0,0.05)",
     transition: "all 0.25s ease",
-    flexShrink: 0, 
   },
 };
