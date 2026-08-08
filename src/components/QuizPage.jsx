@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 const API_BASE = "https://quizappbackend-k09m.onrender.com";
@@ -124,14 +124,21 @@ function QuizPage() {
     };
   }, []);
 
-  // ---------- Quiz status polling ----------
+  // ---------- Quiz status polling (WITH SECURE TIME SYNC) ----------
   useEffect(() => {
     if (quizActive || !student) return;
 
     const checkStatus = async () => {
       try {
-        const res = await fetch(`${API_BASE}/quiz-status`);
-        const data = await res.json();
+        // Fetch both status AND server time to prevent local clock cheating
+        const [statusRes, timeRes] = await Promise.all([
+          fetch(`${API_BASE}/quiz-status`),
+          fetch(`${API_BASE}/servertime`)
+        ]);
+        
+        const data = await statusRes.json();
+        const timeData = await timeRes.json();
+        const serverNow = new Date(timeData.serverTimeUTC);
 
         if (data.isQuizOpen) {
           setQuizActive(true);
@@ -140,7 +147,7 @@ function QuizPage() {
           navigate("/login");
         } else {
           if (examStartTime) {
-            const diff = Math.ceil((new Date(data.startTime) - new Date()) / 1000);
+            const diff = Math.ceil((examStartTime - serverNow) / 1000);
             setWaitTime(diff > 0 ? diff : 0);
           }
         }
@@ -164,6 +171,12 @@ function QuizPage() {
       setQuestionsError(null);
 
       try {
+        // 1. Fetch exact server time right before starting
+        const timeRes = await fetch(`${API_BASE}/servertime`);
+        const timeData = await timeRes.json();
+        const currentServerTime = new Date(timeData.serverTimeUTC);
+
+        // 2. Start/Resume Attempt
         const startRes = await fetch(`${API_BASE}/start-quiz`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -171,7 +184,6 @@ function QuizPage() {
         });
         const startData = await startRes.json();
 
-        // Block if they have already submitted
         if (startRes.status === 403 && startData.message.includes("submitted")) {
             alert(startData.message);
             navigate("/login");
@@ -180,10 +192,10 @@ function QuizPage() {
 
         if (!startData.success) throw new Error(startData.message);
 
+        // 3. SECURE TIME SYNC: Calculate remaining time using SERVER time, not laptop time!
         const attemptStartTime = new Date(startData.startTime);
         const attemptEndTime = new Date(attemptStartTime.getTime() + startData.durationMinutes * 60000);
-        const now = new Date();
-        const remainingSeconds = Math.floor((attemptEndTime - now) / 1000);
+        const remainingSeconds = Math.floor((attemptEndTime - currentServerTime) / 1000);
 
         if (remainingSeconds <= 0) {
           setDisqualified(true);
@@ -530,18 +542,17 @@ const styles = {
     userSelect: "none" 
   },
   
-  // DYNAMIC TOP BAR (Wraps perfectly on small screens)
+  // DYNAMIC GRID TOP BAR
   topBar: { 
-    display: "flex", 
-    flexWrap: "wrap", // Crucial for mobile responsiveness
-    justifyContent: "space-between", 
+    display: "grid", 
+    gridTemplateColumns: "1fr auto 1fr", // 3 Columns: Left, Center, Right
     alignItems: "center", 
     padding: "clamp(0.5rem, 2vw, 0.75rem) clamp(1rem, 4vw, 2rem)", 
     backgroundColor: "#ffffff", 
     borderBottom: "1px solid #e5e7eb", 
     gap: "1rem" 
   },
-  profileSection: { display: "flex", alignItems: "center", gap: "0.75rem", flex: "1 1 200px" },
+  profileSection: { display: "flex", alignItems: "center", gap: "0.75rem", justifySelf: "flex-start" },
   profileEmoji: { fontSize: "clamp(1.2rem, 3vw, 1.4rem)" },
   profileDetails: { display: "flex", flexDirection: "column", lineHeight: 1.3, fontSize: "clamp(0.85rem, 2vw, 0.95rem)" },
   
@@ -555,17 +566,15 @@ const styles = {
     padding: "clamp(0.3rem, 1.5vw, 0.5rem) clamp(1rem, 3vw, 1.5rem)", 
     borderRadius: "60px", 
     border: "1px solid #e5e7eb",
-    flex: "1 1 200px", // Keeps it centered when flexed
-    maxWidth: "max-content",
-    margin: "0 auto"
+    justifySelf: "center",
   },
   timerLabel: { fontSize: "clamp(0.9rem, 2vw, 1.2rem)", color: "black", margin: 0 },
   timerText: { fontSize: "clamp(1.2rem, 3vw, 1.6rem)", fontWeight: 700, fontVariantNumeric: "tabular-nums" },
   
-  // FIXED SUBMIT BUTTON (No longer massive)
+  // FIXED SUBMIT BUTTON 
   primaryBtn: { 
     padding: "clamp(0.5rem, 2vw, 0.6rem) clamp(1rem, 3vw, 1.5rem)", 
-    fontSize: "clamp(0.9rem, 2vw, 1rem)", // Fixed from 3rem
+    fontSize: "clamp(0.9rem, 2vw, 1rem)", // NO MORE 3rem
     fontWeight: 600, 
     backgroundColor: "#0066b3", 
     color: "#fff", 
@@ -573,9 +582,8 @@ const styles = {
     borderRadius: "8px", 
     cursor: "pointer", 
     boxShadow: "0 2px 8px rgba(0, 102, 179, 0.25)",
-    flex: "1 1 200px",
-    maxWidth: "fit-content",
-    marginLeft: "auto"
+    width: "fit-content",
+    justifySelf: "flex-end" // Anchors exactly to the right edge
   },
   
   progressBarContainer: { height: 4, backgroundColor: "#e5e7eb", width: "100%" },
@@ -585,14 +593,14 @@ const styles = {
   bodyRow: { 
     display: "flex", 
     flex: 1, 
-    flexWrap: "wrap", // Pushes Sidebar below on super narrow screens
+    flexWrap: "wrap", 
     overflowY: "auto", 
     padding: "clamp(0.5rem, 2vw, 1rem)", 
     gap: "1rem" 
   },
   
   mainContent: { 
-    flex: "1 1 300px", // Grows to fill space but won't shrink below 300px
+    flex: "1 1 300px", 
     padding: "clamp(1rem, 3vw, 2rem)", 
     overflowY: "auto", 
     backgroundColor: "#ffffff", 
@@ -632,7 +640,7 @@ const styles = {
     border: "1px solid #d1d5db", 
     borderRadius: "8px", 
     cursor: "pointer", 
-    flex: "1 1 auto", // Allows buttons to squeeze and fill smoothly
+    flex: "1 1 auto", 
     maxWidth: "200px",
     minWidth: "100px",
     textAlign: "center"
@@ -653,8 +661,8 @@ const styles = {
   },
   
   sidebar: { 
-    flex: "1 1 200px", // Adapts gracefully alongside main content
-    maxWidth: "100%", // Takes full width if it gets wrapped below
+    flex: "1 1 200px", 
+    maxWidth: "100%", 
     backgroundColor: "#ffffff", 
     borderRadius: "12px", 
     boxShadow: "0 2px 8px rgba(0,0,0,0.06)", 
@@ -663,7 +671,6 @@ const styles = {
     display: "flex", 
     flexDirection: "column" 
   },
-  // SUPER RESPONSIVE QUESTION PALETTE
   paletteGrid: { 
     display: "grid", 
     gridTemplateColumns: "repeat(auto-fill, minmax(40px, 1fr))", 
