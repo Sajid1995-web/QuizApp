@@ -6,35 +6,48 @@ function ResultPage() {
   const navigate = useNavigate();
   const { state } = useLocation();
 
-  const { student, disqualified } = state || {};
+  const { 
+    student, 
+    disqualified, 
+    totalMarksObtained, 
+    totalMarks, 
+    totalTimeMinutes 
+  } = state || {};
 
-  // Handle missing state
+  // Handle missing state (e.g., user navigated here directly)
   if (!state) {
     return (
-      <div className="page-card">
-        <p>No result data found.</p>
-        <button onClick={() => navigate("/login")}>Back to Login</button>
+      <div style={styles.page}>
+        <div style={{ ...styles.container, maxWidth: 500, padding: 40, textAlign: "center", flexDirection: "column" }}>
+          <h2 style={{ color: "#dc3545", marginBottom: 10 }}>No Data Found</h2>
+          <p style={{ color: "#666", marginBottom: 20 }}>We couldn't find your result data.</p>
+          <button onClick={() => navigate("/login")} style={styles.actionBtn}>
+            Back to Login
+          </button>
+        </div>
       </div>
     );
   }
 
-  // Disqualified
-  if (disqualified) {
+  // Handle Disqualified State (Explicit flag OR -1 marks from backend)
+  if (disqualified || totalMarksObtained === -1) {
     return (
-      <div className="page-card" style={{ maxWidth: 600 }}>
-        <h2 style={{ color: "#dc3545" }}>Disqualified</h2>
-        <p>You did not submit the quiz in time.</p>
-        <button onClick={() => navigate("/login")}>Back to Login</button>
+      <div style={styles.page}>
+        <div style={{ ...styles.container, maxWidth: 500, padding: 40, textAlign: "center", flexDirection: "column" }}>
+          <div style={{ fontSize: 60, marginBottom: 10 }}>⏳</div>
+          <h2 style={{ color: "#dc3545", marginBottom: 10 }}>Disqualified</h2>
+          <p style={{ color: "#666", fontSize: "1.1rem", marginBottom: 20 }}>
+            You did not submit the quiz within the allowed time limit, or a violation was detected. Your attempt has been disqualified.
+          </p>
+          <button onClick={() => navigate("/login")} style={styles.actionBtn}>
+            Back to Login
+          </button>
+        </div>
       </div>
     );
   }
 
-  const {
-    totalMarksObtained,
-    totalMarks,
-    totalTimeMinutes,
-  } = state;
-
+  // Handle Successful Submission State
   return (
     <div style={styles.page}>
       <div style={styles.container}>
@@ -64,19 +77,11 @@ function ResultPage() {
             <div style={{ fontSize: 50, marginBottom: 10 }}>🎉</div>
             <h3 style={{ color: "#28a745" }}>Submission Successful!</h3>
             <p style={{ color: "#666", marginTop: 10 }}>
-              Your answers have been recorded.
+              Your answers have been recorded safely.
             </p>
             <button
-              onClick={() => navigate("/login")}
-              style={{
-                marginTop: 20,
-                padding: "10px 20px",
-                backgroundColor: "#007bff",
-                color: "#fff",
-                border: "none",
-                borderRadius: 6,
-                cursor: "pointer",
-              }}
+              onClick={() => navigate("/")}
+              style={{ ...styles.actionBtn, marginTop: 20 }}
             >
               Back to Home
             </button>
@@ -132,5 +137,16 @@ const styles = {
   rankRevealed: {
     textAlign: "center",
     width: "100%",
+  },
+  actionBtn: {
+    padding: "10px 20px",
+    backgroundColor: "#007bff",
+    color: "#fff",
+    border: "none",
+    borderRadius: 6,
+    cursor: "pointer",
+    fontSize: "1rem",
+    fontWeight: "bold",
+    transition: "background 0.2s",
   },
 };

@@ -1,8 +1,8 @@
- import React, { useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./App.css";
 
-const API_BASE = "https://quizappbackend-k09m.onrender.com";
+const API_BASE = "http://localhost:3000";
 
 function Login() {
   const navigate = useNavigate();
@@ -24,6 +24,13 @@ function Login() {
       });
 
       const data = await res.json();
+
+      // --- NEW CHECK: Is the quiz already submitted? ---
+      if (data.isQuizSubmitted) {
+        alert("You have already submitted the quiz.");
+        setError(data.message || "You have already submitted the quiz.");
+        return; // Stop execution here
+      }
 
       if (data.success) {
         navigate("/quiz", {
