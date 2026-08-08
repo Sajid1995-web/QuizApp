@@ -15,7 +15,7 @@ function RulesPage() {
           ← Back to Home
         </button>
 
-        <h1 style={styles.title}>📜 NSTAD Online Quiz – Rules & Regulations</h1>
+        <h1 style={styles.title}>National Science and Technology Digital Archive (NSTAD) </h1>
         <p style={styles.subtitle}>
           Please read all rules carefully before starting the quiz.
         </p>
