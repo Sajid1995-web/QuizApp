@@ -4,6 +4,31 @@ import { useLocation, useNavigate } from "react-router-dom";
 const API_BASE = "https://quizappbackend-k09m.onrender.com";
 
 // ---------- Utility: Fisher–Yates shuffle ----------
+// Inside QuizPage component, e.g., in useEffect or a start function
+const startQuiz = async () => {
+  try {
+    const res = await fetch(`${API_BASE}/start-quiz`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ regNo: student.regNo }), // or whatever your backend expects
+    });
+
+    if (!res.ok) {
+      if (res.status === 403) {
+        alert("You have already submitted the quiz. You cannot start again.");
+        navigate("/login"); // redirect to login or home
+        return;
+      }
+      throw new Error(`Server responded with ${res.status}`);
+    }
+
+    const data = await res.json();
+    // ... process quiz data
+  } catch (error) {
+    console.error("Start quiz error:", error);
+    alert("Could not start the quiz. Please try again later.");
+  }
+};
 const shuffleArray = (array) => {
   const newArray = [...array];
   for (let i = newArray.length - 1; i > 0; i--) {
