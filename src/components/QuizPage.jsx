@@ -1,10 +1,7 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+\import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 const API_BASE = "https://quizappbackend-k09m.onrender.com";
-
-// ---------- Utility: Fisher–Yates shuffle ----------
-// Inside QuizPage component, e.g., in useEffect or a start function
 
 const shuffleArray = (array) => {
   const newArray = [...array];
@@ -35,6 +32,7 @@ function QuizPage() {
   const [questionsError, setQuestionsError] = useState(null);
   const [isLandscape, setIsLandscape] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [startChecked, setStartChecked] = useState(false); // new: to track if start API called
 
   const timerRef = useRef(null);
   const autoSubmitted = useRef(false);
@@ -54,31 +52,52 @@ function QuizPage() {
     }
   };
 
+  // ---------- Redirect if no student ----------
   useEffect(() => {
-    const startQuiz = async () => {
-  try {
-    const res = await fetch(`${API_BASE}/start-quiz`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ regNo: student.regNo }), // or whatever your backend expects
-    });
+    if (!student) navigate("/login");
+  }, [student, navigate]);
 
-    if (!res.ok) {
-      if (res.status === 403) {
-        alert("You have already submitted the quiz. You cannot start again.");
-        navigate("/login"); // redirect to login or home
-        return;
+  // ---------- Call /start-quiz on mount ----------
+  useEffect(() => {
+    if (!student || startChecked) return;
+
+    const checkStart = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/start-quiz`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ regNo: student.regNo }),
+        });
+
+        if (!res.ok) {
+          if (res.status === 403) {
+            alert("You have already submitted the quiz. You cannot start again.");
+            navigate("/login");
+            return;
+          }
+          // Other errors: show alert and redirect to login
+          alert("Could not start the quiz. Please try again later.");
+          navigate("/login");
+          return;
+        }
+
+        // Success – quiz can start
+        const data = await res.json();
+        // Optionally use data for any additional setup
+        setQuizActive(true);
+        setStartChecked(true);
+      } catch (err) {
+        console.error("Start quiz error:", err);
+        alert("Network error. Please try again.");
+        navigate("/login");
       }
-      throw new Error(`Server responded with ${res.status}`);
-    }
+    };
 
-    const data = await res.json();
-    // ... process quiz data
-  } catch (error) {
-    console.error("Start quiz error:", error);
-    alert("Could not start the quiz. Please try again later.");
-  }
-};
+    checkStart();
+  }, [student, navigate, startChecked]);
+
+  // ---------- Fullscreen event listeners (unchanged) ----------
+  useEffect(() => {
     const handleFullscreenChange = () => {
       const isCurrentlyFullscreen = !!(
         document.fullscreenElement ||
@@ -102,12 +121,7 @@ function QuizPage() {
     };
   }, []);
 
-  // Redirect if no student
-  useEffect(() => {
-    if (!student) navigate("/login");
-  }, [student, navigate]);
-
-  // ---------- Orientation enforcement ----------
+  // ---------- Orientation enforcement (unchanged) ----------
   useEffect(() => {
     const checkOrientation = () => {
       const isLandscapeNow =
@@ -135,7 +149,7 @@ function QuizPage() {
     };
   }, []);
 
-  // ---------- Quiz status polling ----------
+  // ---------- Quiz status polling (unchanged, but only if quizActive is false) ----------
   useEffect(() => {
     if (quizActive || !student) return;
 
@@ -156,7 +170,6 @@ function QuizPage() {
           setQuizActive(true);
         } else if (data.hasEnded) {
           if (!autoSubmitted.current && !submitting) {
-            // UPDATED ALERT: removed "Please register again"
             alert("The quiz has ended. You cannot take it now.");
             navigate("/login");
           }
@@ -177,7 +190,7 @@ function QuizPage() {
     return () => clearInterval(interval);
   }, [quizActive, student, navigate, examStartTime, submitting]);
 
-  // ---------- Fetch questions ----------
+  // ---------- Fetch questions (only when quizActive becomes true) ----------
   useEffect(() => {
     if (!quizActive) return;
 
@@ -187,6 +200,9 @@ function QuizPage() {
       setQuestionsError(null);
 
       try {
+        // Note: We already called /start-quiz; we might not need to call it again,
+        // but we'll keep it for safety (or remove if redundant).
+        // Actually we can remove this extra call, but it's fine.
         await fetch(`${API_BASE}/start-quiz`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -218,7 +234,7 @@ function QuizPage() {
     fetchQuestions();
   }, [quizActive, student.regNo]);
 
-  // ---------- Navigation ----------
+  // ---------- Navigation (unchanged) ----------
   const goTo = (idx) => {
     if (idx >= 0 && idx < questions.length) setCurrent(idx);
   };
@@ -235,7 +251,7 @@ function QuizPage() {
     setAnswers(updated);
   };
 
-  // ---------- Submit quiz ----------
+  // ---------- Submit quiz (unchanged) ----------
   const submitQuiz = useCallback(
     async (auto = false) => {
       if (submitted) return;
@@ -304,7 +320,7 @@ function QuizPage() {
     }
   }, []);
 
-  // ---------- Timer effect ----------
+  // ---------- Timer effect (unchanged) ----------
   useEffect(() => {
     if (!quizActive || submitted || questions.length === 0) return;
 
@@ -322,10 +338,10 @@ function QuizPage() {
     return () => clearInterval(timerRef.current);
   }, [quizActive, submitted, questions.length, handleTimeExpired]);
 
-  // ---------- Determine mobile ----------
+  // ---------- Determine mobile (unchanged) ----------
   const isMobile = window.innerWidth < 768 || "ontouchstart" in window;
 
-  // ---------- Landscape overlay ----------
+  // ---------- Landscape overlay (unchanged) ----------
   if (isMobile && !isLandscape) {
     return (
       <div style={styles.landscapeOverlay}>
@@ -343,7 +359,7 @@ function QuizPage() {
     );
   }
 
-  // ---------- Fullscreen blocker ----------
+  // ---------- Fullscreen blocker (unchanged) ----------
   if (quizActive && quizReady && !isFullscreen && !submitted) {
     return (
       <div style={styles.fullscreenOverlay}>
@@ -361,7 +377,7 @@ function QuizPage() {
     );
   }
 
-  // ---------- Waiting screen (text updated: "quiz" instead of "exam") ----------
+  // ---------- Waiting screen (unchanged) ----------
   if (!quizActive) {
     const totalSecs = waitTime || 0;
     const hours = Math.floor(totalSecs / 3600);
@@ -390,6 +406,7 @@ function QuizPage() {
           </div>
         </div>
         <div style={styles.blurredQuiz}>
+          {/* ... blurred placeholder content (unchanged) ... */}
           <div style={styles.fakeHeader}>
             <div style={styles.fakeLogo}></div>
             <div style={styles.fakeStudent}>
@@ -425,7 +442,7 @@ function QuizPage() {
     );
   }
 
-  // ---------- Loading / error / submitting ----------
+  // ---------- Loading / error / submitting (unchanged) ----------
   if (loadingQuestions || !quizReady) {
     return (
       <div style={styles.loadingOverlay}>
@@ -525,6 +542,7 @@ function QuizPage() {
     );
   }
 
+  // ---------- Render quiz (unchanged) ----------
   const attemptedCount = answers.filter((a) => a !== null).length;
   const totalQuestions = questions.length;
   const progress = ((current + 1) / totalQuestions) * 100;
@@ -709,7 +727,7 @@ function QuizPage() {
   );
 }
 
-// ---------- Styles ----------
+// ---------- Styles (unchanged) ----------
 const styles = {
   fullscreenOverlay: {
     position: "fixed",
