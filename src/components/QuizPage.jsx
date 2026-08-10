@@ -341,22 +341,20 @@ function QuizPage() {
 
   // ---------- Waiting screen ----------
   if (!quizActive) {
-    const mins = Math.floor((waitTime || 0) / 60);
-    const secs = (waitTime || 0) % 60;
-    const startTimeStr = examStartTime
-      ? examStartTime.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" })
-      : "soon";
+    const totalSecs = waitTime || 0;
+    const hours = Math.floor(totalSecs / 3600);
+    const mins = Math.floor((totalSecs % 3600) / 60);
+    const secs = totalSecs % 60;
 
     return (
       <div style={styles.waitContainer}>
         <div style={styles.overlay}>
           <div style={styles.warningCard}>
-            <h2 style={{ color: "#000" }}>🔒 Exam not started yet</h2>
-            <p style={{ color: "#000" }}>
-              Scheduled start at <strong>{startTimeStr}</strong> IST
-            </p>
+            <h2 style={{ color: "#000" }}>📝 Quiz will begin in</h2>
             <div style={{ ...styles.countdown, color: "#0066b3" }}>
-              {mins.toString().padStart(2, "0")}:{secs.toString().padStart(2, "0")}
+              {hours.toString().padStart(2, "0")}:
+              {mins.toString().padStart(2, "0")}:
+              {secs.toString().padStart(2, "0")}
             </div>
             <p style={{ color: "#000" }}>
               The page will refresh automatically when the exam begins.
@@ -506,6 +504,11 @@ function QuizPage() {
   const custom = student?.customData || {};
   const displayName = custom.name || custom.email || student?.regNo || "Student";
 
+  // Format timer as HH:MM:SS
+  const timerHours = Math.floor(timeLeft / 3600);
+  const timerMinutes = Math.floor((timeLeft % 3600) / 60);
+  const timerSeconds = timeLeft % 60;
+
   return (
     <div style={styles.page}>
       {/* Top Bar */}
@@ -528,11 +531,9 @@ function QuizPage() {
               color: timeLeft <= 60 ? "#dc2626" : "#000",
             }}
           >
-            {Math.floor(timeLeft / 60)
-              .toString()
-              .padStart(2, "0")}
-            :
-            {(timeLeft % 60).toString().padStart(2, "0")}
+            {timerHours.toString().padStart(2, "0")}:
+            {timerMinutes.toString().padStart(2, "0")}:
+            {timerSeconds.toString().padStart(2, "0")}
           </span>
         </div>
         <button
