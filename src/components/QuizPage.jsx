@@ -18,13 +18,13 @@ function QuizPage() {
   const { state } = useLocation();
   const student = state?.student;
   const examStartTime = state?.examStartTime ? new Date(state.examStartTime) : null;
-  const examDuration = state?.examDuration || 30;
+  const Duration = state?.Duration || 30;
 
   const [questions, setQuestions] = useState([]);
   const [quizReady, setQuizReady] = useState(false);
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState([]);
-  const [timeLeft, setTimeLeft] = useState(examDuration * 60);
+  const [timeLeft, setTimeLeft] = useState(Duration * 60);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [quizActive, setQuizActive] = useState(false);
@@ -134,7 +134,7 @@ function QuizPage() {
             navigate("/login");
           }
         } else {
-          if (examStartTime) {
+          if (StartTime) {
             const diff = Math.ceil((new Date(data.startTime) - new Date()) / 1000);
             setWaitTime(diff > 0 ? diff : 0);
           }
@@ -148,7 +148,7 @@ function QuizPage() {
     const interval = setInterval(checkStatus, 1000);
     statusIntervalRef.current = interval;
     return () => clearInterval(interval);
-  }, [quizActive, student, navigate, examStartTime, submitting]);
+  }, [quizActive, student, navigate, StartTime, submitting]);
 
   // ---------- Fetch questions ----------
   useEffect(() => {
@@ -323,7 +323,7 @@ function QuizPage() {
         <div style={styles.overlayCard}>
           <h2 style={{ color: "#dc2626" }}>⚠️ Fullscreen Required</h2>
           <p style={{ color: "#000", margin: "1rem 0" }}>
-            You must be in fullscreen mode to take this exam. Leaving fullscreen
+            You must be in fullscreen mode to take this quiz. Leaving fullscreen
             may result in disqualification.
           </p>
           <button onClick={enterFullscreen} style={styles.primaryBtn}>
@@ -352,7 +352,7 @@ function QuizPage() {
               {secs.toString().padStart(2, "0")}
             </div>
             <p style={{ color: "#000" }}>
-              The page will refresh automatically when the exam begins.
+              The page will refresh automatically when the quiz begins.
             </p>
           </div>
         </div>
