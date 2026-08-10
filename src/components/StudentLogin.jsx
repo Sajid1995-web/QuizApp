@@ -53,7 +53,7 @@ function Login() {
             <label className="form-label">Registration Number</label>
             <input
               type="text"
-              placeholder="e.g., TRV-0001"
+              placeholder="Please enter your registration number"
               value={regNo}
               onChange={(e) => setRegNo(e.target.value)}
               required
@@ -65,7 +65,7 @@ function Login() {
             <label className="form-label">Email</label>
             <input
               type="email"
-              placeholder="Enter your registered email"
+              placeholder="Please enter your registered email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
