@@ -1,4 +1,4 @@
- import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 const API_BASE = "https://quizappbackend-k09m.onrender.com";
@@ -129,7 +129,6 @@ function QuizPage() {
           }
           setQuizActive(true);
         } else if (data.hasEnded) {
-          // Only navigate if we are not already auto-submitting
           if (!autoSubmitted.current && !submitting) {
             alert("The quiz has ended. You cannot take it now. Please register again.");
             navigate("/login");
@@ -217,7 +216,6 @@ function QuizPage() {
       setSubmitted(true);
       setSubmitting(true);
       clearInterval(timerRef.current);
-      // Clear status polling to prevent interference
       if (statusIntervalRef.current) {
         clearInterval(statusIntervalRef.current);
         statusIntervalRef.current = null;
@@ -240,7 +238,6 @@ function QuizPage() {
         });
         const data = await res.json();
 
-        // Force disqualification if auto-submit and time is up (backup safety)
         if (auto && timeLeft === 0) {
           data.disqualified = true;
         }
@@ -263,7 +260,6 @@ function QuizPage() {
     [questions, answers, student, navigate, submitted, timeLeft]
   );
 
-  // Keep ref updated
   useEffect(() => {
     submitQuizRef.current = submitQuiz;
   }, [submitQuiz]);
@@ -272,7 +268,6 @@ function QuizPage() {
   const handleTimeExpired = useCallback(() => {
     if (autoSubmitted.current) return;
     autoSubmitted.current = true;
-    // Clear status polling to prevent alert interference
     if (statusIntervalRef.current) {
       clearInterval(statusIntervalRef.current);
       statusIntervalRef.current = null;
@@ -303,12 +298,12 @@ function QuizPage() {
   // ---------- Determine mobile ----------
   const isMobile = window.innerWidth < 768 || "ontouchstart" in window;
 
-  // ---------- Landscape overlay ----------
+  // ---------- Landscape overlay (with tilt animation) ----------
   if (isMobile && !isLandscape) {
     return (
       <div style={styles.landscapeOverlay}>
         <div style={styles.landscapeContent}>
-          <div style={styles.rotateIcon}>📱↻</div>
+          <div style={styles.rotateIcon}>📱</div>
           <h2 style={{ color: "#000" }}>Please rotate your device</h2>
           <p style={{ color: "#000" }}>
             This quiz must be taken in <strong>landscape</strong> mode.
@@ -350,7 +345,7 @@ function QuizPage() {
       <div style={styles.waitContainer}>
         <div style={styles.overlay}>
           <div style={styles.warningCard}>
-            <h2 style={{ color: "#000" }}>📝 Quiz will begin in</h2>
+            <h2 style={{ color: "#000" }}>🔒 Quiz will begin in</h2>
             <div style={{ ...styles.countdown, color: "#0066b3" }}>
               {hours.toString().padStart(2, "0")}:
               {mins.toString().padStart(2, "0")}:
@@ -504,14 +499,12 @@ function QuizPage() {
   const custom = student?.customData || {};
   const displayName = custom.name || custom.email || student?.regNo || "Student";
 
-  // Format timer as HH:MM:SS
   const timerHours = Math.floor(timeLeft / 3600);
   const timerMinutes = Math.floor((timeLeft % 3600) / 60);
   const timerSeconds = timeLeft % 60;
 
   return (
     <div style={styles.page}>
-      {/* Top Bar */}
       <div style={styles.topBar}>
         <div style={styles.profileSection}>
           <span style={styles.profileEmoji}>👤</span>
@@ -545,13 +538,11 @@ function QuizPage() {
         </button>
       </div>
 
-      {/* Progress Bar */}
       <div style={styles.progressBarContainer}>
         <div style={{ ...styles.progressBar, width: `${progress}%` }} />
       </div>
 
       <div style={styles.bodyRow}>
-        {/* Main Content */}
         <div style={styles.mainContent}>
           <h3 style={{ marginTop: 0, color: "#000" }}>
             Question {current + 1} of {totalQuestions}
@@ -626,7 +617,6 @@ function QuizPage() {
           </div>
         </div>
 
-        {/* Sidebar */}
         <div style={styles.sidebar}>
           <h4 style={{ marginTop: 0, marginBottom: "0.5rem", color: "#000" }}>
             Question Palette
@@ -734,7 +724,7 @@ const styles = {
     fontSize: "4rem",
     marginBottom: "1rem",
     display: "inline-block",
-    animation: "spin 2s linear infinite",
+    animation: "tilt 2s ease-in-out infinite",
   },
   waitContainer: {
     position: "relative",
@@ -1142,12 +1132,17 @@ const styles = {
   },
 };
 
-// Inject spinner animation globally
+// Inject animations globally
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `
   @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
+  }
+  @keyframes tilt {
+    0%   { transform: rotate(0deg); }
+    50%  { transform: rotate(90deg); }
+    100% { transform: rotate(0deg); }
   }
 `;
 document.head.appendChild(styleSheet);
