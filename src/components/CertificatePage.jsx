@@ -154,7 +154,7 @@ const styles = {
     fontFamily: "'Segoe UI', Roboto, system-ui, sans-serif",
     padding: "20px",
     // Use the ReferenceCard.webp as the background image
-    backgroundImage: `url("/ReferenceCard.webp")`,
+    backgroundImage: `url("/ReferenceCard.png")`,
     backgroundSize: "cover",
     backgroundPosition: "center",
     backgroundRepeat: "no-repeat",
