@@ -1,9 +1,8 @@
-
- import React, { useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./App.css";
 
-  const API_BASE = "https://quizappbackend-k09m.onrender.com";
+const API_BASE = "https://quizappbackend-k09m.onrender.com";
 
 function Login() {
   const navigate = useNavigate();
@@ -27,6 +26,16 @@ function Login() {
       const data = await res.json();
 
       if (data.success) {
+        // 🛑 Check if the student has already submitted the quiz
+        if (data.student && data.student.submitted === true) {
+          const msg = "You have already logged in and submitted the quiz.";
+          setError(msg);
+          window.alert(msg);      // show a browser alert
+          setLoading(false);
+          return;                 // stop further navigation
+        }
+
+        // ✅ If not submitted, proceed to quiz
         navigate("/quiz", {
           state: {
             student: data.student,
@@ -96,7 +105,7 @@ function Login() {
 
 export default Login;
 
-// ---------- Styles ----------
+// ---------- Styles (unchanged) ----------
 const styles = {
   pageWrapper: {
     display: "flex",
