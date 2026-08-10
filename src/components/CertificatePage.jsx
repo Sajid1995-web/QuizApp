@@ -59,13 +59,12 @@ function ResultPage() {
     );
   }
 
-  // ---- SUCCESSFUL SUBMISSION: Full‑page Certificate ----
+  // ---- SUCCESSFUL SUBMISSION: Background image + certificate overlay ----
   return (
-    <div style={styles.page}>
+    <div style={styles.pageWithBg}>
+      {/* Certificate overlay on top of the background image */}
       <div style={styles.certificate}>
-        {/* Decorative top border / ribbon */}
         <div style={styles.certHeader}>
-          <span style={styles.seal}>🎓</span>
           <h1 style={styles.certTitle}>Certificate of Completion</h1>
         </div>
 
@@ -105,6 +104,7 @@ function ResultPage() {
 export default ResultPage;
 
 const styles = {
+  // Disqualified page styles (unchanged)
   page: {
     display: "flex",
     flexDirection: "column",
@@ -115,7 +115,6 @@ const styles = {
     fontFamily: "'Segoe UI', Roboto, system-ui, sans-serif",
     padding: "20px",
   },
-  // Disqualified styles (unchanged)
   container: {
     display: "flex",
     flexWrap: "wrap",
@@ -145,14 +144,30 @@ const styles = {
     width: "100%",
   },
 
-  // Certificate styles for successful submission
+  // Successful submission: background image + certificate
+  pageWithBg: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: "100vh",
+    fontFamily: "'Segoe UI', Roboto, system-ui, sans-serif",
+    padding: "20px",
+    // Use the ReferenceCard.webp as the background image
+    backgroundImage: `url("/ReferenceCard.webp")`,
+    backgroundSize: "cover",
+    backgroundPosition: "center",
+    backgroundRepeat: "no-repeat",
+  },
+
   certificate: {
     maxWidth: 700,
     width: "100%",
-    backgroundColor: "#ffffff",
+    backgroundColor: "rgba(255, 255, 255, 0.85)",
+    backdropFilter: "blur(6px)",
     borderRadius: 20,
-    boxShadow: "0 12px 40px rgba(0,0,0,0.12)",
-    border: "6px solid #f0c040",
+    boxShadow: "0 12px 40px rgba(0,0,0,0.2)",
+    border: "4px solid rgba(255, 215, 0, 0.6)",
     padding: "2rem 2.5rem",
     textAlign: "center",
     transition: "transform 0.2s",
@@ -162,11 +177,6 @@ const styles = {
     borderBottom: "2px dashed #e5e7eb",
     paddingBottom: "1.5rem",
     marginBottom: "1.5rem",
-  },
-  seal: {
-    fontSize: 64,
-    display: "block",
-    marginBottom: "0.5rem",
   },
   certTitle: {
     fontSize: 32,
