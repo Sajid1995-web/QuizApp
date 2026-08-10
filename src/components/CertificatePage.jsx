@@ -1,4 +1,4 @@
-import React from "react";
+ import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "./App.css";
 
@@ -62,7 +62,6 @@ function ResultPage() {
   // ---- SUCCESSFUL SUBMISSION: Background image + certificate overlay ----
   return (
     <div style={styles.pageWithBg}>
-      {/* Certificate overlay on top of the background image */}
       <div style={styles.certificate}>
         <div style={styles.certHeader}>
           <h1 style={styles.certTitle}>Certificate of Completion</h1>
@@ -92,9 +91,13 @@ function ResultPage() {
         </div>
 
         <div style={styles.certFooter}>
-          <button style={styles.certButton} onClick={() => navigate("/")}>
+          {/* Replaced button with plain text link */}
+          <span
+            style={styles.homeLink}
+            onClick={() => navigate("/")}
+          >
             Back to Home
-          </button>
+          </span>
         </div>
       </div>
     </div>
@@ -153,7 +156,6 @@ const styles = {
     minHeight: "100vh",
     fontFamily: "'Segoe UI', Roboto, system-ui, sans-serif",
     padding: "20px",
-    // Use the ReferenceCard.webp as the background image
     backgroundImage: `url("/ReferanceCard.png")`,
     backgroundSize: "cover",
     backgroundPosition: "center",
@@ -200,18 +202,13 @@ const styles = {
     borderTop: "2px dashed #e5e7eb",
     paddingTop: "1.5rem",
   },
-  certButton: {
-  padding: "12px 36px",
-  fontSize: 16,
-  fontWeight: 600,
-  backgroundColor: "#fff",
-  color: "#000",
-  border: "none",
-  borderTop: "2px solid #000",
-  borderRadius: 30,
-  cursor: "pointer",
-  transition: "background 0.2s, transform 0.1s",
-  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-},
-
+  // New style for the home link – plain black text
+  homeLink: {
+    color: "#000",
+    fontSize: "16px",
+    fontWeight: 500,
+    cursor: "pointer",
+    textDecoration: "underline",
+    transition: "color 0.2s",
+  },
 };
