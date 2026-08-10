@@ -3,7 +3,7 @@
 import { useNavigate } from "react-router-dom";
 import "./App.css";
 
-  const API_BASE = "https://ascent-halt-glorify.ngrok-free.dev ";
+  const API_BASE = "https://quizappbackend-k09m.onrender.com";
 
 function Login() {
   const navigate = useNavigate();
