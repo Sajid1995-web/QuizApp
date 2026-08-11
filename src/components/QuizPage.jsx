@@ -648,24 +648,46 @@ function QuizPage() {
           </div>
 
           <div style={styles.navRow}>
-            <button
-              style={styles.navBtn}
-              onClick={() => goTo(current - 1)}
-              disabled={current === 0}
-            >
-              ← Previous
-            </button>
-            <button style={styles.clearBtn} onClick={clearAnswer}>
-              Clear Answer
-            </button>
-            <button
-              style={styles.navBtn}
-              onClick={() => goTo(current + 1)}
-              disabled={current === questions.length - 1}
-            >
-              Next →
-            </button>
-          </div>
+  {/* Previous Button */}
+  <button
+    type="button"
+    style={{
+      ...styles.navBtn,
+      ...(current === 0 ? styles.navBtnDisabled : {}),
+    }}
+    onClick={() => goTo(current - 1)}
+    disabled={current === 0}
+    aria-disabled={current === 0}
+  >
+    ← Previous
+  </button>
+
+  {/* Clear Answer */}
+  <button
+    type="button"
+    style={styles.clearBtn}
+    onClick={clearAnswer}
+    disabled={answers[current] === null}
+  >
+    Clear Answer
+  </button>
+
+  {/* Next Button */}
+  <button
+    type="button"
+    style={{
+      ...styles.navBtn,
+      ...(current === questions.length - 1
+        ? styles.navBtnDisabled
+        : {}),
+    }}
+    onClick={() => goTo(current + 1)}
+    disabled={current === questions.length - 1}
+    aria-disabled={current === questions.length - 1}
+  >
+    Next →
+  </button>
+</div>
         </div>
 
         <div style={styles.sidebar}>
@@ -1022,6 +1044,14 @@ const styles = {
     width: "auto",
     whiteSpace: "nowrap",
   },
+  navBtnDisabled: {
+  backgroundColor: "#e5e7eb",
+  color: "#9ca3af",
+  border: "1px solid #d1d5db",
+  cursor: "not-allowed",
+  opacity: 0.6,
+  boxShadow: "none",
+},
   clearBtn: {
     display: "inline-flex",
     alignItems: "center",
