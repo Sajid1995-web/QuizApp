@@ -1,4 +1,4 @@
-import React, {
+ import React, {
   useEffect,
   useState,
   useRef,
@@ -177,33 +177,54 @@ function QuizPage() {
   // ------------------------------------------------------------
 
   const enterFullscreen =
-    useCallback(() => {
+    useCallback(async () => {
       const elem = document.documentElement;
 
-      if (
-        document.fullscreenElement ||
-        document.webkitFullscreenElement ||
-        document.mozFullScreenElement ||
-        document.msFullscreenElement
-      ) {
-        return;
-      }
+      try {
+        const alreadyFullscreen = !!(
+          document.fullscreenElement ||
+          document.webkitFullscreenElement ||
+          document.mozFullScreenElement ||
+          document.msFullscreenElement
+        );
 
-      if (elem.requestFullscreen) {
-        elem.requestFullscreen().catch((err) => {
-          console.error(
-            "Fullscreen request failed:",
-            err
+        if (!alreadyFullscreen) {
+          if (elem.requestFullscreen) {
+            await elem.requestFullscreen();
+          } else if (elem.webkitRequestFullscreen) {
+            elem.webkitRequestFullscreen();
+          } else if (elem.msRequestFullscreen) {
+            elem.msRequestFullscreen();
+          }
+        }
+
+        /*
+         * Orientation locking is supported only by some browsers,
+         * and normally requires fullscreen. Never make fullscreen
+         * or the quiz fail just because orientation locking is not
+         * supported. The existing portrait overlay remains the
+         * fallback on unsupported browsers.
+         */
+        try {
+          if (
+            screen.orientation &&
+            screen.orientation.lock
+          ) {
+            await screen.orientation.lock(
+              "landscape"
+            );
+          }
+        } catch (orientationError) {
+          console.warn(
+            "Could not lock landscape orientation:",
+            orientationError
           );
-        });
-      } else if (
-        elem.webkitRequestFullscreen
-      ) {
-        elem.webkitRequestFullscreen();
-      } else if (
-        elem.msRequestFullscreen
-      ) {
-        elem.msRequestFullscreen();
+        }
+      } catch (err) {
+        console.error(
+          "Fullscreen request failed:",
+          err
+        );
       }
     }, []);
 
@@ -278,6 +299,79 @@ function QuizPage() {
         "MSFullscreenChange",
         handleFullscreenChange
       );
+    };
+  }, []);
+
+  // ------------------------------------------------------------
+  // LOCK LANDSCAPE DURING QUIZ
+  // ------------------------------------------------------------
+  //
+  // The browser can only enforce orientation on browsers that
+  // expose Screen Orientation Lock, normally while fullscreen.
+  // Unsupported browsers fall back to the existing portrait
+  // overlay below.
+  // ------------------------------------------------------------
+
+  useEffect(() => {
+    if (!quizActive || submitted) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const lockLandscape = async () => {
+      if (
+        !document.fullscreenElement &&
+        !document.webkitFullscreenElement
+      ) {
+        return;
+      }
+
+      try {
+        if (
+          screen.orientation &&
+          screen.orientation.lock
+        ) {
+          await screen.orientation.lock(
+            "landscape"
+          );
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.warn(
+            "Could not lock landscape orientation:",
+            err
+          );
+        }
+      }
+    };
+
+    lockLandscape();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [quizActive, submitted]);
+
+  // ------------------------------------------------------------
+  // UNLOCK ORIENTATION AFTER QUIZ
+  // ------------------------------------------------------------
+
+  useEffect(() => {
+    return () => {
+      try {
+        if (
+          screen.orientation &&
+          screen.orientation.unlock
+        ) {
+          screen.orientation.unlock();
+        }
+      } catch (err) {
+        console.warn(
+          "Could not unlock orientation:",
+          err
+        );
+      }
     };
   }, []);
 
@@ -1239,6 +1333,21 @@ function QuizPage() {
             data.disqualified === undefined
           ) {
             data.disqualified = true;
+          }
+
+          // Unlock orientation before leaving the result page.
+          try {
+            if (
+              screen.orientation &&
+              screen.orientation.unlock
+            ) {
+              screen.orientation.unlock();
+            }
+          } catch (orientationError) {
+            console.log(
+              "Could not unlock orientation:",
+              orientationError
+            );
           }
 
           // Exit fullscreen
