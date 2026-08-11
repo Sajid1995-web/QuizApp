@@ -1,198 +1,610 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+} from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 const API_BASE = "https://quizappbackend-k09m.onrender.com";
 
 const shuffleArray = (array) => {
   const newArray = [...array];
+
   for (let i = newArray.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
+
     [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
   }
+
   return newArray;
 };
 
 function QuizPage() {
   const navigate = useNavigate();
   const { state } = useLocation();
+
   const student = state?.student;
-  const examStartTime = state?.examStartTime ? new Date(state.examStartTime) : null;
-  const examDuration = state?.examDuration || 30;
+
+  /*
+   * IMPORTANT:
+   * Do NOT use examStartTime from navigation state as the
+   * authoritative exam time.
+   *
+   * The backend /quiz-status endpoint is authoritative.
+   */
+  const initialExamStartTime = state?.examStartTime
+    ? new Date(state.examStartTime)
+    : null;
+
+  const initialExamDuration = state?.examDuration || 30;
+
+  // ------------------------------------------------------------
+  // STATE
+  // ------------------------------------------------------------
 
   const [questions, setQuestions] = useState([]);
   const [quizReady, setQuizReady] = useState(false);
+
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState([]);
-  const [timeLeft, setTimeLeft] = useState(examDuration * 60);
+
+  const [timeLeft, setTimeLeft] = useState(
+    initialExamDuration * 60
+  );
+
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  /*
+   * quizActive means:
+   * The backend says the scheduled exam is currently open.
+   *
+   * It does NOT mean /start-quiz has already been called.
+   */
   const [quizActive, setQuizActive] = useState(false);
+
   const [waitTime, setWaitTime] = useState(null);
-  const [loadingQuestions, setLoadingQuestions] = useState(true);
+
+  const [loadingQuestions, setLoadingQuestions] = useState(false);
   const [questionsError, setQuestionsError] = useState(null);
+
   const [isLandscape, setIsLandscape] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [startChecked, setStartChecked] = useState(false); // new: to track if start API called
+
+  /*
+   * This prevents multiple calls to /start-quiz.
+   */
+  const [startChecked, setStartChecked] = useState(false);
+
+  /*
+   * Server-controlled exam times.
+   */
+  const [serverStartTime, setServerStartTime] = useState(
+    initialExamStartTime
+  );
+
+  const [serverEndTime, setServerEndTime] = useState(null);
+
+  const [serverDurationMinutes, setServerDurationMinutes] = useState(
+    initialExamDuration
+  );
+
+  // ------------------------------------------------------------
+  // REFS
+  // ------------------------------------------------------------
 
   const timerRef = useRef(null);
+
   const autoSubmitted = useRef(false);
+
   const submitQuizRef = useRef(null);
-  const timerInitialized = useRef(false);
+
   const statusIntervalRef = useRef(null);
 
-  // ---------- Fullscreen Enforcer ----------
-  const enterFullscreen = () => {
+  /*
+   * Prevent duplicate start requests even if React effects
+   * are triggered more than once.
+   */
+  const startRequestInProgress = useRef(false);
+
+  // ------------------------------------------------------------
+  // FULLSCREEN
+  // ------------------------------------------------------------
+
+  const enterFullscreen = useCallback(() => {
     const elem = document.documentElement;
+
+    if (document.fullscreenElement) {
+      return;
+    }
+
     if (elem.requestFullscreen) {
-      elem.requestFullscreen().catch((err) => console.error(err));
+      elem.requestFullscreen().catch((err) => {
+        console.error("Fullscreen request failed:", err);
+      });
     } else if (elem.webkitRequestFullscreen) {
       elem.webkitRequestFullscreen();
     } else if (elem.msRequestFullscreen) {
       elem.msRequestFullscreen();
     }
-  };
+  }, []);
 
-  // ---------- Redirect if no student ----------
+  // ------------------------------------------------------------
+  // REDIRECT IF NO STUDENT
+  // ------------------------------------------------------------
+
   useEffect(() => {
-    if (!student) navigate("/login");
+    if (!student) {
+      navigate("/login", { replace: true });
+    }
   }, [student, navigate]);
 
-  // ---------- Call /start-quiz on mount ----------
-  useEffect(() => {
-    if (!student || startChecked) return;
+  // ------------------------------------------------------------
+  // FULLSCREEN CHANGE LISTENER
+  // ------------------------------------------------------------
 
-    const checkStart = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/start-quiz`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ regNo: student.regNo }),
-        });
-
-        if (!res.ok) {
-          if (res.status === 403) {
-            alert("You have already submitted the quiz. You cannot start again.");
-            navigate("/login");
-            return;
-          }
-          // Other errors: show alert and redirect to login
-          alert("Could not start the quiz. Please try again later.");
-          navigate("/login");
-          return;
-        }
-
-        // Success – quiz can start
-        const data = await res.json();
-        // Optionally use data for any additional setup
-        setQuizActive(true);
-        setStartChecked(true);
-      } catch (err) {
-        console.error("Start quiz error:", err);
-        alert("Network error. Please try again.");
-        navigate("/login");
-      }
-    };
-
-    checkStart();
-  }, [student, navigate, startChecked]);
-
-  // ---------- Fullscreen event listeners (unchanged) ----------
   useEffect(() => {
     const handleFullscreenChange = () => {
-      const isCurrentlyFullscreen = !!(
+      const currentlyFullscreen = !!(
         document.fullscreenElement ||
         document.webkitFullscreenElement ||
         document.mozFullScreenElement ||
         document.msFullscreenElement
       );
-      setIsFullscreen(isCurrentlyFullscreen);
+
+      setIsFullscreen(currentlyFullscreen);
     };
 
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
-    document.addEventListener("mozfullscreenchange", handleFullscreenChange);
-    document.addEventListener("MSFullscreenChange", handleFullscreenChange);
+    document.addEventListener(
+      "fullscreenchange",
+      handleFullscreenChange
+    );
+
+    document.addEventListener(
+      "webkitfullscreenchange",
+      handleFullscreenChange
+    );
+
+    document.addEventListener(
+      "mozfullscreenchange",
+      handleFullscreenChange
+    );
+
+    document.addEventListener(
+      "MSFullscreenChange",
+      handleFullscreenChange
+    );
 
     return () => {
-      document.removeEventListener("fullscreenchange", handleFullscreenChange);
-      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
-      document.removeEventListener("mozfullscreenchange", handleFullscreenChange);
-      document.removeEventListener("MSFullscreenChange", handleFullscreenChange);
+      document.removeEventListener(
+        "fullscreenchange",
+        handleFullscreenChange
+      );
+
+      document.removeEventListener(
+        "webkitfullscreenchange",
+        handleFullscreenChange
+      );
+
+      document.removeEventListener(
+        "mozfullscreenchange",
+        handleFullscreenChange
+      );
+
+      document.removeEventListener(
+        "MSFullscreenChange",
+        handleFullscreenChange
+      );
     };
   }, []);
 
-  // ---------- Orientation enforcement (unchanged) ----------
+  // ------------------------------------------------------------
+  // ORIENTATION
+  // ------------------------------------------------------------
+
   useEffect(() => {
     const checkOrientation = () => {
       const isLandscapeNow =
         window.matchMedia("(orientation: landscape)").matches ||
-        (window.screen?.orientation?.type?.startsWith("landscape") ?? false) ||
+        (
+          window.screen?.orientation?.type?.startsWith("landscape") ??
+          false
+        ) ||
         window.innerWidth > window.innerHeight;
+
       setIsLandscape(isLandscapeNow);
     };
 
     checkOrientation();
-    const handleChange = () => checkOrientation();
 
-    window.addEventListener("orientationchange", handleChange);
-    window.addEventListener("resize", handleChange);
+    const handleChange = () => {
+      checkOrientation();
+    };
+
+    window.addEventListener(
+      "orientationchange",
+      handleChange
+    );
+
+    window.addEventListener(
+      "resize",
+      handleChange
+    );
+
     if (window.screen?.orientation) {
-      window.screen.orientation.addEventListener("change", handleChange);
+      window.screen.orientation.addEventListener(
+        "change",
+        handleChange
+      );
     }
 
     return () => {
-      window.removeEventListener("orientationchange", handleChange);
-      window.removeEventListener("resize", handleChange);
+      window.removeEventListener(
+        "orientationchange",
+        handleChange
+      );
+
+      window.removeEventListener(
+        "resize",
+        handleChange
+      );
+
       if (window.screen?.orientation) {
-        window.screen.orientation.removeEventListener("change", handleChange);
+        window.screen.orientation.removeEventListener(
+          "change",
+          handleChange
+        );
       }
     };
   }, []);
 
-  // ---------- Quiz status polling (unchanged, but only if quizActive is false) ----------
+  // ------------------------------------------------------------
+  // CHECK EXAM STATUS
+  //
+  // IMPORTANT:
+  // We check /quiz-status FIRST.
+  //
+  // We do NOT call /start-quiz while waiting.
+  // ------------------------------------------------------------
+
   useEffect(() => {
-    if (quizActive || !student) return;
+    if (!student || submitted) {
+      return;
+    }
+
+    let cancelled = false;
 
     const checkStatus = async () => {
       try {
-        const res = await fetch(`${API_BASE}/quiz-status`);
+        const res = await fetch(
+          `${API_BASE}/quiz-status`,
+          {
+            cache: "no-store",
+          }
+        );
+
+        if (!res.ok) {
+          throw new Error(
+            `Quiz status request failed (${res.status})`
+          );
+        }
+
         const data = await res.json();
 
+        if (cancelled) {
+          return;
+        }
+
+        // --------------------------------------------------------
+        // SERVER TIMES
+        // --------------------------------------------------------
+
+        const start = data.startTime
+          ? new Date(data.startTime)
+          : null;
+
+        const end = data.endTime
+          ? new Date(data.endTime)
+          : null;
+
+        if (start && !Number.isNaN(start.getTime())) {
+          setServerStartTime(start);
+        }
+
+        if (end && !Number.isNaN(end.getTime())) {
+          setServerEndTime(end);
+        }
+
+        if (
+          data.durationMinutes !== undefined &&
+          data.durationMinutes !== null
+        ) {
+          setServerDurationMinutes(
+            Number(data.durationMinutes)
+          );
+        }
+
+        // --------------------------------------------------------
+        // QUIZ IS OPEN
+        // --------------------------------------------------------
+
         if (data.isQuizOpen) {
-          if (!timerInitialized.current) {
-            const end = new Date(data.endTime);
-            const now = new Date();
-            let remaining = Math.floor((end - now) / 1000);
-            if (remaining < 0) remaining = 0;
-            setTimeLeft(remaining);
-            timerInitialized.current = true;
-          }
           setQuizActive(true);
-        } else if (data.hasEnded) {
+
+          /*
+           * Calculate remaining time from the SERVER end time.
+           *
+           * This prevents the countdown from starting before
+           * the scheduled exam start.
+           */
+          if (end && !Number.isNaN(end.getTime())) {
+            const now = Date.now();
+
+            const remaining = Math.max(
+              0,
+              Math.ceil((end.getTime() - now) / 1000)
+            );
+
+            setTimeLeft(remaining);
+          }
+
+          /*
+           * STOP status polling once the quiz is open.
+           *
+           * The timer itself will handle the remaining time.
+           */
+          if (statusIntervalRef.current) {
+            clearInterval(statusIntervalRef.current);
+
+            statusIntervalRef.current = null;
+          }
+
+          return;
+        }
+
+        // --------------------------------------------------------
+        // QUIZ HAS ENDED
+        // --------------------------------------------------------
+
+        if (data.hasEnded) {
           if (!autoSubmitted.current && !submitting) {
-            alert("The quiz has ended. You cannot take it now.");
-            navigate("/login");
+            alert(
+              "The quiz has ended. You cannot take it now."
+            );
+
+            navigate("/login", { replace: true });
           }
-        } else {
-          if (examStartTime) {
-            const diff = Math.ceil((new Date(data.startTime) - new Date()) / 1000);
-            setWaitTime(diff > 0 ? diff : 0);
-          }
+
+          return;
+        }
+
+        // --------------------------------------------------------
+        // QUIZ HAS NOT STARTED
+        // --------------------------------------------------------
+
+        setQuizActive(false);
+
+        if (start && !Number.isNaN(start.getTime())) {
+          const now = Date.now();
+
+          const diff = Math.max(
+            0,
+            Math.ceil((start.getTime() - now) / 1000)
+          );
+
+          setWaitTime(diff);
         }
       } catch (err) {
-        console.error("Status check error:", err);
+        console.error(
+          "Quiz status check error:",
+          err
+        );
+
+        /*
+         * Do NOT redirect just because one status request
+         * temporarily fails.
+         *
+         * The next polling request can recover.
+         */
       }
     };
 
+    /*
+     * Check immediately.
+     */
     checkStatus();
-    const interval = setInterval(checkStatus, 1000);
-    statusIntervalRef.current = interval;
-    return () => clearInterval(interval);
-  }, [quizActive, student, navigate, examStartTime, submitting]);
 
-  // ---------- Fetch questions (only when quizActive becomes true) ----------
+    /*
+     * While waiting, check every second.
+     */
+    statusIntervalRef.current = setInterval(
+      checkStatus,
+      1000
+    );
+
+    return () => {
+      cancelled = true;
+
+      if (statusIntervalRef.current) {
+        clearInterval(statusIntervalRef.current);
+
+        statusIntervalRef.current = null;
+      }
+    };
+  }, [
+    student,
+    submitted,
+    submitting,
+    navigate,
+  ]);
+
+  // ------------------------------------------------------------
+  // START QUIZ
+  //
+  // IMPORTANT:
+  // This only runs AFTER /quiz-status says the quiz is open.
+  //
+  // /start-quiz creates the student's QuizAttempt in backend,
+  // so it must NEVER be called during the waiting period.
+  // ------------------------------------------------------------
+
   useEffect(() => {
-    if (!quizActive) return;
+    if (!student) {
+      return;
+    }
+
+    if (!quizActive) {
+      return;
+    }
+
+    if (startChecked) {
+      return;
+    }
+
+    if (startRequestInProgress.current) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const startQuiz = async () => {
+      startRequestInProgress.current = true;
+
+      try {
+        const res = await fetch(
+          `${API_BASE}/start-quiz`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            cache: "no-store",
+            body: JSON.stringify({
+              regNo: student.regNo,
+            }),
+          }
+        );
+
+        const data = await res.json();
+
+        if (cancelled) {
+          return;
+        }
+
+        // ------------------------------------------------------
+        // ALREADY SUBMITTED
+        // ------------------------------------------------------
+
+        if (res.status === 403) {
+          alert(
+            data?.message ||
+              "You have already submitted this quiz. You cannot start again."
+          );
+
+          navigate("/login", { replace: true });
+
+          return;
+        }
+
+        // ------------------------------------------------------
+        // OTHER SERVER ERROR
+        // ------------------------------------------------------
+
+        if (!res.ok || !data.success) {
+          throw new Error(
+            data?.message ||
+              "Could not start the quiz."
+          );
+        }
+
+        /*
+         * Backend returns the attempt's startTime and
+         * durationMinutes.
+         *
+         * Since we only call this after the scheduled quiz
+         * is open, this attempt start should be valid.
+         */
+        if (data.startTime) {
+          const attemptStart = new Date(
+            data.startTime
+          );
+
+          if (!Number.isNaN(attemptStart.getTime())) {
+            /*
+             * Keep the server scheduled start as the
+             * authoritative exam start.
+             *
+             * We don't replace it with an arbitrary
+             * frontend timestamp.
+             */
+          }
+        }
+
+        if (
+          data.durationMinutes !== undefined &&
+          data.durationMinutes !== null
+        ) {
+          setServerDurationMinutes(
+            Number(data.durationMinutes)
+          );
+        }
+
+        setStartChecked(true);
+      } catch (err) {
+        console.error(
+          "Start quiz error:",
+          err
+        );
+
+        if (!cancelled) {
+          alert(
+            err.message ||
+              "Could not start the quiz. Please try again."
+          );
+
+          navigate("/login", {
+            replace: true,
+          });
+        }
+      } finally {
+        startRequestInProgress.current = false;
+      }
+    };
+
+    startQuiz();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    student,
+    quizActive,
+    startChecked,
+    navigate,
+  ]);
+
+  // ------------------------------------------------------------
+  // FETCH QUESTIONS
+  //
+  // IMPORTANT:
+  // There is NO second /start-quiz call here.
+  // ------------------------------------------------------------
+
+  useEffect(() => {
+    if (!quizActive) {
+      return;
+    }
+
+    if (!startChecked) {
+      return;
+    }
+
+    if (!student) {
+      return;
+    }
+
+    let cancelled = false;
 
     const fetchQuestions = async () => {
       setLoadingQuestions(true);
@@ -200,176 +612,774 @@ function QuizPage() {
       setQuestionsError(null);
 
       try {
-        // Note: We already called /start-quiz; we might not need to call it again,
-        // but we'll keep it for safety (or remove if redundant).
-        // Actually we can remove this extra call, but it's fine.
-        await fetch(`${API_BASE}/start-quiz`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ regNo: student.regNo }),
-        });
+        const res = await fetch(
+          `${API_BASE}/get-questions`,
+          {
+            cache: "no-store",
+          }
+        );
 
-        const res = await fetch(`${API_BASE}/get-questions`);
         const data = await res.json();
 
-        if (!data.success) throw new Error(data.message);
+        if (!res.ok || !data.success) {
+          throw new Error(
+            data?.message ||
+              "Could not load questions."
+          );
+        }
 
-        const withIndex = data.questions.map((q, idx) => ({
-          ...q,
-          originalIndex: idx,
-        }));
+        if (!Array.isArray(data.questions)) {
+          throw new Error(
+            "Invalid questions response from server."
+          );
+        }
 
-        const shuffled = shuffleArray(withIndex);
+        const withIndex = data.questions.map(
+          (q, idx) => ({
+            ...q,
+            originalIndex: idx,
+          })
+        );
+
+        const shuffled =
+          shuffleArray(withIndex);
+
+        if (cancelled) {
+          return;
+        }
 
         setQuestions(shuffled);
-        setAnswers(new Array(shuffled.length).fill(null));
+
+        setAnswers(
+          new Array(shuffled.length).fill(null)
+        );
+
+        setCurrent(0);
+
         setQuizReady(true);
       } catch (err) {
-        setQuestionsError(err.message);
+        console.error(
+          "Question loading error:",
+          err
+        );
+
+        if (!cancelled) {
+          setQuestionsError(
+            err.message ||
+              "Failed to load questions."
+          );
+        }
       } finally {
-        setLoadingQuestions(false);
+        if (!cancelled) {
+          setLoadingQuestions(false);
+        }
       }
     };
 
     fetchQuestions();
-  }, [quizActive, student.regNo]);
 
-  // ---------- Navigation (unchanged) ----------
-  const goTo = (idx) => {
-    if (idx >= 0 && idx < questions.length) setCurrent(idx);
-  };
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    quizActive,
+    startChecked,
+    student,
+  ]);
 
-  const selectAnswer = (key) => {
-    const updated = [...answers];
-    updated[current] = key;
-    setAnswers(updated);
-  };
+  // ------------------------------------------------------------
+  // NAVIGATION
+  // ------------------------------------------------------------
 
-  const clearAnswer = () => {
-    const updated = [...answers];
-    updated[current] = null;
-    setAnswers(updated);
-  };
+  const goTo = useCallback(
+    (idx) => {
+      if (
+        idx >= 0 &&
+        idx < questions.length
+      ) {
+        setCurrent(idx);
+      }
+    },
+    [questions.length]
+  );
 
-  // ---------- Submit quiz (unchanged) ----------
+  // ------------------------------------------------------------
+  // SELECT ANSWER
+  // ------------------------------------------------------------
+
+  const selectAnswer = useCallback(
+    (key) => {
+      setAnswers((prev) => {
+        const updated = [...prev];
+
+        updated[current] = key;
+
+        return updated;
+      });
+    },
+    [current]
+  );
+
+  // ------------------------------------------------------------
+  // CLEAR ANSWER
+  // ------------------------------------------------------------
+
+  const clearAnswer = useCallback(() => {
+    setAnswers((prev) => {
+      const updated = [...prev];
+
+      updated[current] = null;
+
+      return updated;
+    });
+  }, [current]);
+
+  // ------------------------------------------------------------
+  // SUBMIT QUIZ
+  // ------------------------------------------------------------
+
   const submitQuiz = useCallback(
     async (auto = false) => {
-      if (submitted) return;
-      if (!auto && !window.confirm("Are you sure you want to submit the quiz?")) return;
+      if (submitted) {
+        return;
+      }
+
+      if (submitting) {
+        return;
+      }
+
+      if (!auto) {
+        const confirmed = window.confirm(
+          "Are you sure you want to submit the quiz?"
+        );
+
+        if (!confirmed) {
+          return;
+        }
+      }
+
       setSubmitted(true);
       setSubmitting(true);
-      clearInterval(timerRef.current);
+
+      // Stop timer
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+
+        timerRef.current = null;
+      }
+
+      // Stop status polling
       if (statusIntervalRef.current) {
-        clearInterval(statusIntervalRef.current);
+        clearInterval(
+          statusIntervalRef.current
+        );
+
         statusIntervalRef.current = null;
       }
 
       try {
-        const originalAnswers = new Array(questions.length).fill(null);
-        questions.forEach((q, shuffledIndex) => {
-          originalAnswers[q.originalIndex] = answers[shuffledIndex];
-        });
+        /*
+         * Convert shuffled answers back to the original
+         * question order.
+         */
+        const originalAnswers = new Array(
+          questions.length
+        ).fill(null);
 
-        const res = await fetch(`${API_BASE}/submit-quiz`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            regNo: student.regNo,
-            answers: originalAnswers,
-            auto: auto,
-          }),
-        });
+        questions.forEach(
+          (question, shuffledIndex) => {
+            originalAnswers[
+              question.originalIndex
+            ] =
+              answers[shuffledIndex] ?? null;
+          }
+        );
+
+        const res = await fetch(
+          `${API_BASE}/submit-quiz`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              regNo: student.regNo,
+              answers: originalAnswers,
+              auto,
+            }),
+          }
+        );
+
         const data = await res.json();
 
-        if (auto && timeLeft === 0) {
+        if (!res.ok) {
+          throw new Error(
+            data?.message ||
+              "Submission failed."
+          );
+        }
+
+        /*
+         * Backend already marks auto submission as
+         * disqualified.
+         *
+         * Keep this extra frontend flag for compatibility
+         * with your existing result page.
+         */
+        if (auto && timeLeft <= 0) {
           data.disqualified = true;
         }
 
-        if (document.fullscreenElement && document.exitFullscreen) {
-          document.exitFullscreen().catch((err) => console.log(err));
+        // Exit fullscreen
+        try {
+          if (
+            document.fullscreenElement &&
+            document.exitFullscreen
+          ) {
+            await document.exitFullscreen();
+          }
+        } catch (fullscreenError) {
+          console.log(
+            "Could not exit fullscreen:",
+            fullscreenError
+          );
         }
 
         navigate("/result", {
-          state: { ...data, student, totalQuestions: questions.length },
+          replace: true,
+          state: {
+            ...data,
+            student,
+            totalQuestions:
+              questions.length,
+          },
         });
       } catch (err) {
-        alert("Submission failed: " + err.message);
+        console.error(
+          "Submission error:",
+          err
+        );
+
+        alert(
+          "Submission failed: " +
+            (err.message || "Unknown error")
+        );
+
+        /*
+         * Allow the student to retry if submission
+         * actually failed.
+         */
         setSubmitted(false);
         setSubmitting(false);
-      } finally {
-        setSubmitting(false);
+
+        /*
+         * Restart status polling if necessary.
+         */
+        if (!statusIntervalRef.current) {
+          // Don't manually restart the polling here.
+          // The component can recover naturally.
+        }
       }
     },
-    [questions, answers, student, navigate, submitted, timeLeft]
+    [
+      submitted,
+      submitting,
+      questions,
+      answers,
+      student,
+      navigate,
+      timeLeft,
+    ]
   );
 
+  // ------------------------------------------------------------
+  // KEEP LATEST SUBMIT FUNCTION IN REF
+  // ------------------------------------------------------------
+
   useEffect(() => {
-    submitQuizRef.current = submitQuiz;
+    submitQuizRef.current =
+      submitQuiz;
   }, [submitQuiz]);
 
-  // ---------- Auto-submit on timer end ----------
-  const handleTimeExpired = useCallback(() => {
-    if (autoSubmitted.current) return;
-    autoSubmitted.current = true;
-    if (statusIntervalRef.current) {
-      clearInterval(statusIntervalRef.current);
-      statusIntervalRef.current = null;
+  // ------------------------------------------------------------
+  // HANDLE TIMER EXPIRATION
+  // ------------------------------------------------------------
+
+  const handleTimeExpired =
+    useCallback(() => {
+      if (autoSubmitted.current) {
+        return;
+      }
+
+      autoSubmitted.current = true;
+
+      if (timerRef.current) {
+        clearInterval(
+          timerRef.current
+        );
+
+        timerRef.current = null;
+      }
+
+      if (statusIntervalRef.current) {
+        clearInterval(
+          statusIntervalRef.current
+        );
+
+        statusIntervalRef.current = null;
+      }
+
+      if (submitQuizRef.current) {
+        submitQuizRef.current(true);
+      }
+    }, []);
+
+  // ------------------------------------------------------------
+  // TIMER
+  //
+  // Timer is based on serverEndTime.
+  //
+  // It does NOT simply start "30 minutes from page load".
+  // ------------------------------------------------------------
+
+  useEffect(() => {
+    if (!quizActive) {
+      return;
     }
-    if (submitQuizRef.current) {
-      submitQuizRef.current(true);
+
+    if (!startChecked) {
+      return;
     }
+
+    if (!quizReady) {
+      return;
+    }
+
+    if (submitted) {
+      return;
+    }
+
+    if (!questions.length) {
+      return;
+    }
+
+    if (
+      !serverEndTime ||
+      Number.isNaN(
+        serverEndTime.getTime()
+      )
+    ) {
+      return;
+    }
+
+    /*
+     * Immediately calculate from server end time.
+     */
+    const updateTimer = () => {
+      const now = Date.now();
+
+      const remaining = Math.max(
+        0,
+        Math.ceil(
+          (serverEndTime.getTime() - now) /
+            1000
+        )
+      );
+
+      setTimeLeft(remaining);
+
+      if (remaining <= 0) {
+        handleTimeExpired();
+      }
+    };
+
+    updateTimer();
+
+    timerRef.current = setInterval(
+      updateTimer,
+      1000
+    );
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(
+          timerRef.current
+        );
+
+        timerRef.current = null;
+      }
+    };
+  }, [
+    quizActive,
+    startChecked,
+    quizReady,
+    submitted,
+    questions.length,
+    serverEndTime,
+    handleTimeExpired,
+  ]);
+
+  // ------------------------------------------------------------
+  // CLEANUP WHEN COMPONENT UNMOUNTS
+  // ------------------------------------------------------------
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(
+          timerRef.current
+        );
+      }
+
+      if (statusIntervalRef.current) {
+        clearInterval(
+          statusIntervalRef.current
+        );
+      }
+    };
   }, []);
 
-  // ---------- Timer effect (unchanged) ----------
-  useEffect(() => {
-    if (!quizActive || submitted || questions.length === 0) return;
+  // ------------------------------------------------------------
+  // MOBILE
+  // ------------------------------------------------------------
 
-    timerRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timerRef.current);
-          handleTimeExpired();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+  const isMobile =
+    window.innerWidth < 768 ||
+    "ontouchstart" in window;
 
-    return () => clearInterval(timerRef.current);
-  }, [quizActive, submitted, questions.length, handleTimeExpired]);
+  // ------------------------------------------------------------
+  // LANDSCAPE OVERLAY
+  // ------------------------------------------------------------
 
-  // ---------- Determine mobile (unchanged) ----------
-  const isMobile = window.innerWidth < 768 || "ontouchstart" in window;
-
-  // ---------- Landscape overlay (unchanged) ----------
-  if (isMobile && !isLandscape) {
+  if (
+    isMobile &&
+    !isLandscape
+  ) {
     return (
       <div style={styles.landscapeOverlay}>
         <div style={styles.landscapeContent}>
-          <div style={styles.rotateIcon}>📱</div>
-          <h2 style={{ color: "#000" }}>Please rotate your device</h2>
+          <div style={styles.rotateIcon}>
+            📱
+          </div>
+
+          <h2 style={{ color: "#000" }}>
+            Please rotate your device
+          </h2>
+
           <p style={{ color: "#000" }}>
-            This quiz must be taken in <strong>landscape</strong> mode.
+            This quiz must be taken in{" "}
+            <strong>landscape</strong> mode.
           </p>
-          <p style={{ color: "#000", fontSize: "0.9rem" }}>
-            Turn your phone sideways to continue.
+
+          <p
+            style={{
+              color: "#000",
+              fontSize: "0.9rem",
+            }}
+          >
+            Turn your phone sideways to
+            continue.
           </p>
         </div>
       </div>
     );
   }
 
-  // ---------- Fullscreen blocker (unchanged) ----------
-  if (quizActive && quizReady && !isFullscreen && !submitted) {
+  // ------------------------------------------------------------
+  // WAITING SCREEN
+  // ------------------------------------------------------------
+
+  if (!quizActive) {
+    const totalSecs =
+      Math.max(
+        0,
+        waitTime || 0
+      );
+
+    const hours = Math.floor(
+      totalSecs / 3600
+    );
+
+    const mins = Math.floor(
+      (totalSecs % 3600) / 60
+    );
+
+    const secs =
+      totalSecs % 60;
+
+    const startTimeStr =
+      serverStartTime
+        ? serverStartTime.toLocaleTimeString(
+            "en-IN",
+            {
+              timeZone:
+                "Asia/Kolkata",
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            }
+          )
+        : "soon";
+
     return (
-      <div style={styles.fullscreenOverlay}>
-        <div style={styles.overlayCard}>
-          <h2 style={{ color: "#dc2626" }}>⚠️ Fullscreen Required</h2>
-          <p style={{ color: "#000", margin: "1rem 0" }}>
-            You must be in fullscreen mode to take this exam. Leaving fullscreen
-            may result in disqualification.
+      <div style={styles.waitContainer}>
+        <div style={styles.overlay}>
+          <div
+            style={
+              styles.warningCard
+            }
+          >
+            <h2
+              style={{
+                color: "#000",
+              }}
+            >
+              🔒 Quiz will begin in
+            </h2>
+
+            <p
+              style={{
+                color: "#000",
+              }}
+            >
+              Scheduled start at{" "}
+              <strong>
+                {startTimeStr}
+              </strong>{" "}
+              IST
+            </p>
+
+            <div
+              style={{
+                ...styles.countdown,
+                color: "#0066b3",
+              }}
+            >
+              {hours
+                .toString()
+                .padStart(2, "0")}
+              :
+              {mins
+                .toString()
+                .padStart(2, "0")}
+              :
+              {secs
+                .toString()
+                .padStart(2, "0")}
+            </div>
+
+            <p
+              style={{
+                color: "#000",
+              }}
+            >
+              The quiz will start
+              automatically when the
+              scheduled exam time is
+              reached.
+            </p>
+
+            <p
+              style={{
+                color: "#555",
+                fontSize:
+                  "0.85rem",
+              }}
+            >
+              Please keep this page
+              open.
+            </p>
+          </div>
+        </div>
+
+        <div
+          style={
+            styles.blurredQuiz
+          }
+        >
+          <div
+            style={
+              styles.fakeHeader
+            }
+          >
+            <div
+              style={
+                styles.fakeLogo
+              }
+            />
+
+            <div
+              style={
+                styles.fakeStudent
+              }
+            >
+              <div
+                style={
+                  styles.fakeLine
+                }
+              />
+
+              <div
+                style={{
+                  ...styles.fakeLine,
+                  width: "70%",
+                }}
+              />
+            </div>
+
+            <div
+              style={
+                styles.fakeTimer
+              }
+            />
+          </div>
+
+          <div
+            style={
+              styles.fakeBody
+            }
+          >
+            <div
+              style={
+                styles.fakeQuestionCard
+              }
+            >
+              <div
+                style={{
+                  ...styles.fakeLine,
+                  width: "85%",
+                  height: 24,
+                }}
+              />
+
+              <div
+                style={{
+                  height: 30,
+                }}
+              />
+
+              {[1, 2, 3, 4].map(
+                (i) => (
+                  <div
+                    key={i}
+                    style={
+                      styles.fakeOption
+                    }
+                  >
+                    <div
+                      style={
+                        styles.fakeRadio
+                      }
+                    />
+
+                    <div
+                      style={{
+                        ...styles.fakeLine,
+                        flex: 1,
+                      }}
+                    />
+                  </div>
+                )
+              )}
+
+              <div
+                style={{
+                  height: 30,
+                }}
+              />
+
+              <div
+                style={
+                  styles.fakeButtons
+                }
+              >
+                <div
+                  style={
+                    styles.fakeButton
+                  }
+                />
+
+                <div
+                  style={
+                    styles.fakeButton
+                  }
+                />
+              </div>
+            </div>
+
+            <div
+              style={
+                styles.fakeSidebar
+              }
+            >
+              {Array.from({
+                length: 25,
+              }).map(
+                (_, i) => (
+                  <div
+                    key={i}
+                    style={
+                      styles.fakePalette
+                    }
+                  />
+                )
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ------------------------------------------------------------
+  // FULLSCREEN BLOCKER
+  // ------------------------------------------------------------
+
+  if (
+    quizActive &&
+    quizReady &&
+    !isFullscreen &&
+    !submitted
+  ) {
+    return (
+      <div
+        style={
+          styles.fullscreenOverlay
+        }
+      >
+        <div
+          style={
+            styles.overlayCard
+          }
+        >
+          <h2
+            style={{
+              color: "#dc2626",
+            }}
+          >
+            ⚠️ Fullscreen Required
+          </h2>
+
+          <p
+            style={{
+              color: "#000",
+              margin: "1rem 0",
+            }}
+          >
+            You must be in fullscreen
+            mode to take this exam.
+            Leaving fullscreen may
+            result in disqualification.
           </p>
-          <button onClick={enterFullscreen} style={styles.primaryBtn}>
+
+          <button
+            onClick={
+              enterFullscreen
+            }
+            style={
+              styles.primaryBtn
+            }
+          >
             Enter Fullscreen
           </button>
         </div>
@@ -377,105 +1387,94 @@ function QuizPage() {
     );
   }
 
-  // ---------- Waiting screen (unchanged) ----------
-  if (!quizActive) {
-    const totalSecs = waitTime || 0;
-    const hours = Math.floor(totalSecs / 3600);
-    const mins = Math.floor((totalSecs % 3600) / 60);
-    const secs = totalSecs % 60;
-    const startTimeStr = examStartTime
-      ? examStartTime.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" })
-      : "soon";
+  // ------------------------------------------------------------
+  // LOADING QUESTIONS
+  // ------------------------------------------------------------
 
+  if (
+    loadingQuestions ||
+    !quizReady
+  ) {
     return (
-      <div style={styles.waitContainer}>
-        <div style={styles.overlay}>
-          <div style={styles.warningCard}>
-            <h2 style={{ color: "#000" }}>🔒 Quiz will begin in</h2>
-            <p style={{ color: "#000" }}>
-              Scheduled start at <strong>{startTimeStr}</strong> IST
-            </p>
-            <div style={{ ...styles.countdown, color: "#0066b3" }}>
-              {hours.toString().padStart(2, "0")}:
-              {mins.toString().padStart(2, "0")}:
-              {secs.toString().padStart(2, "0")}
-            </div>
-            <p style={{ color: "#000" }}>
-              The page will refresh automatically when the <strong>quiz</strong> begins.
-            </p>
-          </div>
-        </div>
-        <div style={styles.blurredQuiz}>
-          {/* ... blurred placeholder content (unchanged) ... */}
-          <div style={styles.fakeHeader}>
-            <div style={styles.fakeLogo}></div>
-            <div style={styles.fakeStudent}>
-              <div style={styles.fakeLine}></div>
-              <div style={{ ...styles.fakeLine, width: "70%" }}></div>
-            </div>
-            <div style={styles.fakeTimer}></div>
-          </div>
-          <div style={styles.fakeBody}>
-            <div style={styles.fakeQuestionCard}>
-              <div style={{ ...styles.fakeLine, width: "85%", height: 24 }}></div>
-              <div style={{ height: 30 }} />
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} style={styles.fakeOption}>
-                  <div style={styles.fakeRadio}></div>
-                  <div style={{ ...styles.fakeLine, flex: 1 }}></div>
-                </div>
-              ))}
-              <div style={{ height: 30 }} />
-              <div style={styles.fakeButtons}>
-                <div style={styles.fakeButton}></div>
-                <div style={styles.fakeButton}></div>
-              </div>
-            </div>
-            <div style={styles.fakeSidebar}>
-              {Array.from({ length: 25 }).map((_, i) => (
-                <div key={i} style={styles.fakePalette}></div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ---------- Loading / error / submitting (unchanged) ----------
-  if (loadingQuestions || !quizReady) {
-    return (
-      <div style={styles.loadingOverlay}>
+      <div
+        style={
+          styles.loadingOverlay
+        }
+      >
         <div
           className="spinner"
           style={{
-            margin: "1rem auto",
+            margin:
+              "1rem auto",
             width: 50,
             height: 50,
-            border: "4px solid #e5e7eb",
-            borderTop: "4px solid #0066b3",
-            borderRadius: "50%",
-            animation: "spin 1s linear infinite",
+            border:
+              "4px solid #e5e7eb",
+            borderTop:
+              "4px solid #0066b3",
+            borderRadius:
+              "50%",
+            animation:
+              "spin 1s linear infinite",
           }}
         />
-        <h2 style={{ color: "#000" }}>Loading Questions...</h2>
-        <p style={{ color: "#000" }}>Please wait</p>
+
+        <h2
+          style={{
+            color: "#000",
+          }}
+        >
+          Loading Questions...
+        </h2>
+
+        <p
+          style={{
+            color: "#000",
+          }}
+        >
+          Please wait
+        </p>
       </div>
     );
   }
+
+  // ------------------------------------------------------------
+  // QUESTION ERROR
+  // ------------------------------------------------------------
 
   if (questionsError) {
     return (
-      <div style={styles.loadingOverlay}>
-        <h2 style={{ color: "#dc2626" }}>⚠️ Error loading questions</h2>
-        <p style={{ color: "#000" }}>{questionsError}</p>
+      <div
+        style={
+          styles.loadingOverlay
+        }
+      >
+        <h2
+          style={{
+            color: "#dc2626",
+          }}
+        >
+          ⚠️ Error loading questions
+        </h2>
+
+        <p
+          style={{
+            color: "#000",
+          }}
+        >
+          {questionsError}
+        </p>
+
         <button
-          className="btn"
-          onClick={() => window.location.reload()}
+          onClick={() =>
+            window.location.reload()
+          }
           style={{
             marginTop: "1rem",
-            padding: "0.5rem 1.5rem",
-            backgroundColor: "#0066b3",
+            padding:
+              "0.5rem 1.5rem",
+            backgroundColor:
+              "#0066b3",
             color: "#fff",
             border: "none",
             borderRadius: "8px",
@@ -487,39 +1486,84 @@ function QuizPage() {
       </div>
     );
   }
+
+  // ------------------------------------------------------------
+  // SUBMITTING
+  // ------------------------------------------------------------
 
   if (submitting) {
     return (
-      <div style={styles.loadingOverlay}>
+      <div
+        style={
+          styles.loadingOverlay
+        }
+      >
         <div
           className="spinner"
           style={{
-            margin: "1rem auto",
+            margin:
+              "1rem auto",
             width: 50,
             height: 50,
-            border: "4px solid #e5e7eb",
-            borderTop: "4px solid #0066b3",
-            borderRadius: "50%",
-            animation: "spin 1s linear infinite",
+            border:
+              "4px solid #e5e7eb",
+            borderTop:
+              "4px solid #0066b3",
+            borderRadius:
+              "50%",
+            animation:
+              "spin 1s linear infinite",
           }}
         />
-        <h2 style={{ color: "#000" }}>Calculating your result...</h2>
-        <p style={{ color: "#000" }}>Please wait</p>
+
+        <h2
+          style={{
+            color: "#000",
+          }}
+        >
+          Calculating your result...
+        </h2>
+
+        <p
+          style={{
+            color: "#000",
+          }}
+        >
+          Please wait
+        </p>
       </div>
     );
   }
 
+  // ------------------------------------------------------------
+  // NO QUESTIONS
+  // ------------------------------------------------------------
+
   if (!questions.length) {
     return (
-      <div style={styles.loadingOverlay}>
-        <h2 style={{ color: "#000" }}>No questions available</h2>
+      <div
+        style={
+          styles.loadingOverlay
+        }
+      >
+        <h2
+          style={{
+            color: "#000",
+          }}
+        >
+          No questions available
+        </h2>
+
         <button
-          className="btn"
-          onClick={() => window.location.reload()}
+          onClick={() =>
+            window.location.reload()
+          }
           style={{
             marginTop: "1rem",
-            padding: "0.5rem 1.5rem",
-            backgroundColor: "#0066b3",
+            padding:
+              "0.5rem 1.5rem",
+            backgroundColor:
+              "#0066b3",
             color: "#fff",
             border: "none",
             borderRadius: "8px",
@@ -532,215 +1576,555 @@ function QuizPage() {
     );
   }
 
-  const q = questions[current];
+  // ------------------------------------------------------------
+  // CURRENT QUESTION
+  // ------------------------------------------------------------
+
+  const q =
+    questions[current];
+
   if (!q) {
     return (
-      <div style={styles.loadingOverlay}>
-        <div className="spinner" />
-        <h2>Preparing Exam...</h2>
+      <div
+        style={
+          styles.loadingOverlay
+        }
+      >
+        <div
+          className="spinner"
+          style={{
+            width: 50,
+            height: 50,
+            border:
+              "4px solid #e5e7eb",
+            borderTop:
+              "4px solid #0066b3",
+            borderRadius:
+              "50%",
+            animation:
+              "spin 1s linear infinite",
+          }}
+        />
+
+        <h2
+          style={{
+            color: "#000",
+          }}
+        >
+          Preparing Exam...
+        </h2>
       </div>
     );
   }
 
-  // ---------- Render quiz (unchanged) ----------
-  const attemptedCount = answers.filter((a) => a !== null).length;
-  const totalQuestions = questions.length;
-  const progress = ((current + 1) / totalQuestions) * 100;
+  // ------------------------------------------------------------
+  // DISPLAY DATA
+  // ------------------------------------------------------------
 
-  const custom = student?.customData || {};
-  const displayName = custom.name || custom.email || student?.regNo || "Student";
+  const attemptedCount =
+    answers.filter(
+      (a) => a !== null
+    ).length;
 
-  const timerHours = Math.floor(timeLeft / 3600);
-  const timerMinutes = Math.floor((timeLeft % 3600) / 60);
-  const timerSeconds = timeLeft % 60;
+  const totalQuestions =
+    questions.length;
+
+  const progress =
+    ((current + 1) /
+      totalQuestions) *
+    100;
+
+  const custom =
+    student?.customData || {};
+
+  const displayName =
+    custom.name ||
+    custom.email ||
+    student?.regNo ||
+    "Student";
+
+  const timerHours =
+    Math.floor(
+      timeLeft / 3600
+    );
+
+  const timerMinutes =
+    Math.floor(
+      (timeLeft % 3600) /
+        60
+    );
+
+  const timerSeconds =
+    timeLeft % 60;
+
+  // ------------------------------------------------------------
+  // QUIZ UI
+  // ------------------------------------------------------------
 
   return (
     <div style={styles.page}>
+      {/* TOP BAR */}
+
       <div style={styles.topBar}>
-        <div style={styles.profileSection}>
-          <span style={styles.profileEmoji}>👤</span>
-          <div style={styles.profileDetails}>
-            <strong style={{ color: "#000" }}>{displayName}</strong>
-            <span style={{ fontSize: "0.8rem", color: "#000" }}>
+        <div
+          style={
+            styles.profileSection
+          }
+        >
+          <span
+            style={
+              styles.profileEmoji
+            }
+          >
+            👤
+          </span>
+
+          <div
+            style={
+              styles.profileDetails
+            }
+          >
+            <strong
+              style={{
+                color: "#000",
+              }}
+            >
+              {displayName}
+            </strong>
+
+            <span
+              style={{
+                fontSize:
+                  "0.8rem",
+                color: "#000",
+              }}
+            >
               {student?.regNo}
-              {custom.email && ` • ${custom.email}`}
+
+              {custom.email &&
+                ` • ${custom.email}`}
             </span>
           </div>
         </div>
-        <div style={styles.timerSection}>
-          <span style={styles.timerEmoji}>⏳</span>
+
+        {/* TIMER */}
+
+        <div
+          style={
+            styles.timerSection
+          }
+        >
+          <span
+            style={
+              styles.timerEmoji
+            }
+          >
+            ⏳
+          </span>
+
           <span
             style={{
               ...styles.timerText,
-              color: timeLeft <= 60 ? "#dc2626" : "#000",
+              color:
+                timeLeft <= 60
+                  ? "#dc2626"
+                  : "#000",
             }}
           >
-            {timerHours.toString().padStart(2, "0")}:
-            {timerMinutes.toString().padStart(2, "0")}:
-            {timerSeconds.toString().padStart(2, "0")}
+            {timerHours
+              .toString()
+              .padStart(2, "0")}
+            :
+            {timerMinutes
+              .toString()
+              .padStart(2, "0")}
+            :
+            {timerSeconds
+              .toString()
+              .padStart(2, "0")}
           </span>
         </div>
+
+        {/* SUBMIT */}
+
         <button
-          onClick={() => submitQuiz(false)}
-          disabled={submitted || timeLeft === 0}
-          style={styles.submitBtn}
+          onClick={() =>
+            submitQuiz(false)
+          }
+          disabled={
+            submitted ||
+            submitting ||
+            timeLeft === 0
+          }
+          style={{
+            ...styles.submitBtn,
+            opacity:
+              submitted ||
+              submitting ||
+              timeLeft === 0
+                ? 0.6
+                : 1,
+            cursor:
+              submitted ||
+              submitting ||
+              timeLeft === 0
+                ? "not-allowed"
+                : "pointer",
+          }}
         >
           Submit Quiz
         </button>
       </div>
 
-      <div style={styles.progressBarContainer}>
-        <div style={{ ...styles.progressBar, width: `${progress}%` }} />
+      {/* PROGRESS */}
+
+      <div
+        style={
+          styles.progressBarContainer
+        }
+      >
+        <div
+          style={{
+            ...styles.progressBar,
+            width: `${progress}%`,
+          }}
+        />
       </div>
 
+      {/* BODY */}
+
       <div style={styles.bodyRow}>
-        <div style={styles.mainContent}>
-          <h3 style={{ marginTop: 0, color: "#000" }}>
-            Question {current + 1} of {totalQuestions}
+        {/* MAIN CONTENT */}
+
+        <div
+          style={
+            styles.mainContent
+          }
+        >
+          <h3
+            style={{
+              marginTop: 0,
+              color: "#000",
+            }}
+          >
+            Question{" "}
+            {current + 1} of{" "}
+            {totalQuestions}
           </h3>
 
-          <p style={styles.questionText}>{q.question}</p>
+          <p
+            style={
+              styles.questionText
+            }
+          >
+            {q.question}
+          </p>
+
+          {/* QUESTION IMAGE */}
 
           {q.imageUrl && (
             <img
               src={`${API_BASE}${q.imageUrl}`}
               alt="Question illustration"
-              style={styles.questionImage}
+              style={
+                styles.questionImage
+              }
+              onError={(e) => {
+                e.currentTarget.style.display =
+                  "none";
+              }}
             />
           )}
 
-          <div style={styles.optionsContainer}>
-            {Object.entries(q.options).map(([key, val]) => {
-              const isSelected = answers[current] === key;
-              return (
-                <label
-                  key={key}
-                  style={{
-                    ...styles.optionLabel,
-                    backgroundColor: isSelected ? "#e6f0fa" : "#ffffff",
-                    borderColor: isSelected ? "#0066b3" : "#d1d5db",
-                  }}
-                >
-                  <input
-                    type="radio"
-                    name={`question-${current}`}
-                    value={key}
-                    checked={isSelected}
-                    onChange={() => selectAnswer(key)}
-                    style={styles.radioInput}
-                  />
-                  <span style={styles.radioControl}>
-                    <span
-                      style={
+          {/* OPTIONS */}
+
+          <div
+            style={
+              styles.optionsContainer
+            }
+          >
+            {Object.entries(
+              q.options || {}
+            ).map(
+              ([key, val]) => {
+                const isSelected =
+                  answers[current] ===
+                  key;
+
+                return (
+                  <label
+                    key={key}
+                    style={{
+                      ...styles.optionLabel,
+
+                      backgroundColor:
                         isSelected
-                          ? styles.radioDotActive
-                          : styles.radioDot
+                          ? "#e6f0fa"
+                          : "#ffffff",
+
+                      borderColor:
+                        isSelected
+                          ? "#0066b3"
+                          : "#d1d5db",
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name={`question-${current}`}
+                      value={key}
+                      checked={
+                        isSelected
+                      }
+                      onChange={() =>
+                        selectAnswer(
+                          key
+                        )
+                      }
+                      style={
+                        styles.radioInput
                       }
                     />
-                  </span>
-                  <span style={styles.optionText}>
-                    <b style={{ color: "#000" }}>{key}.</b>{" "}
-                    <span style={{ color: "#000" }}>{val}</span>
-                  </span>
-                </label>
-              );
-            })}
+
+                    <span
+                      style={
+                        styles.radioControl
+                      }
+                    >
+                      <span
+                        style={
+                          isSelected
+                            ? styles.radioDotActive
+                            : styles.radioDot
+                        }
+                      />
+                    </span>
+
+                    <span
+                      style={
+                        styles.optionText
+                      }
+                    >
+                      <b
+                        style={{
+                          color:
+                            "#000",
+                        }}
+                      >
+                        {key}.
+                      </b>{" "}
+
+                      <span
+                        style={{
+                          color:
+                            "#000",
+                        }}
+                      >
+                        {val}
+                      </span>
+                    </span>
+                  </label>
+                );
+              }
+            )}
           </div>
 
-          <div style={styles.navRow}>
-  {/* Previous Button */}
-  <button
-    type="button"
-    style={{
-      ...styles.navBtn,
-      ...(current === 0 ? styles.navBtnDisabled : {}),
-    }}
-    onClick={() => goTo(current - 1)}
-    disabled={current === 0}
-    aria-disabled={current === 0}
-  >
-    ← Previous
-  </button>
+          {/* NAVIGATION */}
 
-  {/* Clear Answer */}
-  <button
-    type="button"
-    style={styles.clearBtn}
-    onClick={clearAnswer}
-    disabled={answers[current] === null}
-  >
-    Clear Answer
-  </button>
+          <div
+            style={
+              styles.navRow
+            }
+          >
+            {/* PREVIOUS */}
 
-  {/* Next Button */}
-  <button
-    type="button"
-    style={{
-      ...styles.navBtn,
-      ...(current === questions.length - 1
-        ? styles.navBtnDisabled
-        : {}),
-    }}
-    onClick={() => goTo(current + 1)}
-    disabled={current === questions.length - 1}
-    aria-disabled={current === questions.length - 1}
-  >
-    Next →
-  </button>
-</div>
+            <button
+              type="button"
+              style={{
+                ...styles.navBtn,
+
+                ...(current === 0
+                  ? styles.navBtnDisabled
+                  : {}),
+              }}
+              onClick={() =>
+                goTo(
+                  current - 1
+                )
+              }
+              disabled={
+                current === 0
+              }
+            >
+              ← Previous
+            </button>
+
+            {/* CLEAR */}
+
+            <button
+              type="button"
+              style={{
+                ...styles.clearBtn,
+
+                ...(answers[
+                  current
+                ] === null
+                  ? styles.clearBtnDisabled
+                  : {}),
+              }}
+              onClick={
+                clearAnswer
+              }
+              disabled={
+                answers[
+                  current
+                ] === null
+              }
+            >
+              Clear Answer
+            </button>
+
+            {/* NEXT */}
+
+            <button
+              type="button"
+              style={{
+                ...styles.navBtn,
+
+                ...(current ===
+                questions.length - 1
+                  ? styles.navBtnDisabled
+                  : {}),
+              }}
+              onClick={() =>
+                goTo(
+                  current + 1
+                )
+              }
+              disabled={
+                current ===
+                questions.length - 1
+              }
+            >
+              Next →
+            </button>
+          </div>
         </div>
 
-        <div style={styles.sidebar}>
-          <h4 style={{ marginTop: 0, marginBottom: "0.5rem", color: "#000" }}>
+        {/* SIDEBAR */}
+
+        <div
+          style={
+            styles.sidebar
+          }
+        >
+          <h4
+            style={{
+              marginTop: 0,
+              marginBottom:
+                "0.5rem",
+              color: "#000",
+            }}
+          >
             Question Palette
           </h4>
-          <div style={styles.paletteGrid}>
-            {questions.map((_, idx) => {
-              const isAttempted = answers[idx] !== null;
-              const isCurrent = idx === current;
 
-              let bg, color;
-              if (isAttempted) {
-                bg = "#22c55e";
-                color = "#fff";
-              } else {
-                bg = "#f3f4f6";
-                color = "#000";
+          <div
+            style={
+              styles.paletteGrid
+            }
+          >
+            {questions.map(
+              (_, idx) => {
+                const isAttempted =
+                  answers[idx] !==
+                  null;
+
+                const isCurrent =
+                  idx === current;
+
+                let bg;
+                let color;
+
+                if (
+                  isAttempted
+                ) {
+                  bg = "#22c55e";
+                  color = "#fff";
+                } else {
+                  bg = "#f3f4f6";
+                  color = "#000";
+                }
+
+                return (
+                  <div
+                    key={idx}
+                    onClick={() =>
+                      goTo(idx)
+                    }
+                    style={{
+                      ...styles.paletteItem,
+
+                      backgroundColor:
+                        bg,
+
+                      color,
+
+                      border:
+                        isCurrent
+                          ? "3px solid #0066b3"
+                          : "2px solid transparent",
+
+                      cursor:
+                        "pointer",
+                    }}
+                  >
+                    {idx + 1}
+                  </div>
+                );
               }
-
-              return (
-                <div
-                  key={idx}
-                  onClick={() => goTo(idx)}
-                  style={{
-                    ...styles.paletteItem,
-                    backgroundColor: bg,
-                    color: color,
-                    border: isCurrent
-                      ? "3px solid #0066b3"
-                      : "2px solid transparent",
-                    cursor: "pointer",
-                  }}
-                >
-                  {idx + 1}
-                </div>
-              );
-            })}
+            )}
           </div>
-          <div style={styles.sidebarFooter}>
-            <div style={{ color: "#000" }}>
-              <span style={{ ...styles.dot, background: "#22c55e" }} />{" "}
-              Attempted: {attemptedCount}
-            </div>
-            <div style={{ color: "#000" }}>
+
+          <div
+            style={
+              styles.sidebarFooter
+            }
+          >
+            <div
+              style={{
+                color: "#000",
+              }}
+            >
               <span
                 style={{
                   ...styles.dot,
-                  background: "#f3f4f6",
-                  border: "1px solid #d1d5db",
+                  background:
+                    "#22c55e",
                 }}
-              />{" "}
-              Unattempted: {totalQuestions - attemptedCount}
+              />
+
+              Attempted:{" "}
+              {attemptedCount}
+            </div>
+
+            <div
+              style={{
+                color: "#000",
+              }}
+            >
+              <span
+                style={{
+                  ...styles.dot,
+                  background:
+                    "#f3f4f6",
+                  border:
+                    "1px solid #d1d5db",
+                }}
+              />
+
+              Unattempted:{" "}
+              {totalQuestions -
+                attemptedCount}
             </div>
           </div>
         </div>
@@ -749,7 +2133,10 @@ function QuizPage() {
   );
 }
 
-// ---------- Styles (unchanged) ----------
+// ============================================================
+// STYLES
+// ============================================================
+
 const styles = {
   fullscreenOverlay: {
     position: "fixed",
@@ -757,178 +2144,266 @@ const styles = {
     left: 0,
     width: "100%",
     height: "100%",
-    backgroundColor: "rgba(0,0,0,0.85)",
+    backgroundColor:
+      "rgba(0,0,0,0.85)",
     display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent:
+      "center",
+    alignItems:
+      "center",
     zIndex: 99999,
-    backdropFilter: "blur(5px)",
+    backdropFilter:
+      "blur(5px)",
   },
+
   overlayCard: {
-    backgroundColor: "#ffffff",
-    padding: "clamp(1.5rem, 4vw, 2.5rem) clamp(1.5rem, 5vw, 3rem)",
+    backgroundColor:
+      "#ffffff",
+    padding:
+      "clamp(1.5rem, 4vw, 2.5rem) clamp(1.5rem, 5vw, 3rem)",
     borderRadius: "16px",
     textAlign: "center",
-    boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+    boxShadow:
+      "0 20px 60px rgba(0,0,0,0.15)",
     maxWidth: 450,
     width: "90%",
     display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
+    flexDirection:
+      "column",
+    alignItems:
+      "center",
   },
+
   landscapeOverlay: {
     position: "fixed",
     top: 0,
     left: 0,
     width: "100%",
     height: "100%",
-    backgroundColor: "#f8fafc",
+    backgroundColor:
+      "#f8fafc",
     display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent:
+      "center",
+    alignItems:
+      "center",
     zIndex: 9999,
   },
+
   landscapeContent: {
     textAlign: "center",
     padding: "2rem",
     maxWidth: 400,
   },
+
   rotateIcon: {
     fontSize: "4rem",
     marginBottom: "1rem",
-    display: "inline-block",
-    animation: "tilt 2s ease-in-out infinite",
+    display:
+      "inline-block",
+    animation:
+      "tilt 2s ease-in-out infinite",
   },
+
   waitContainer: {
-    position: "relative",
+    position:
+      "relative",
     width: "100%",
     height: "100vh",
     overflow: "hidden",
-    backgroundColor: "#f8fafc",
+    backgroundColor:
+      "#f8fafc",
   },
+
   overlay: {
     position: "absolute",
     top: 0,
     left: 0,
     width: "100%",
     height: "100%",
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor:
+      "rgba(0,0,0,0.5)",
     zIndex: 10,
     display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent:
+      "center",
+    alignItems:
+      "center",
   },
+
   warningCard: {
-    backgroundColor: "#ffffff",
-    padding: "2.5rem 3rem",
+    backgroundColor:
+      "#ffffff",
+    padding:
+      "2.5rem 3rem",
     borderRadius: "16px",
     textAlign: "center",
-    boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+    boxShadow:
+      "0 20px 60px rgba(0,0,0,0.15)",
     maxWidth: 450,
     width: "90%",
   },
+
   countdown: {
     fontSize: 48,
     fontWeight: "bold",
     margin: "15px 0",
     letterSpacing: 2,
+    fontVariantNumeric:
+      "tabular-nums",
   },
+
   blurredQuiz: {
-    filter: "blur(6px)",
-    opacity: 0.5,
-    pointerEvents: "none",
-    height: "100%",
-    display: "flex",
-    flexDirection: "column",
+    position:
+      "absolute",
+    inset: 0,
+    background:
+      "#f5f7fb",
+    filter:
+      "blur(8px)",
+    transform:
+      "scale(1.04)",
+    opacity: 0.9,
+    zIndex: 0,
+    overflow: "hidden",
   },
+
   page: {
-    fontFamily: "'Segoe UI', Roboto, system-ui, sans-serif",
+    fontFamily:
+      "'Segoe UI', Roboto, system-ui, sans-serif",
     display: "flex",
-    flexDirection: "column",
+    flexDirection:
+      "column",
     height: "100vh",
-    backgroundColor: "#f8fafc",
+    backgroundColor:
+      "#f8fafc",
   },
+
   topBar: {
     display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "0.75rem 2rem",
-    backgroundColor: "#ffffff",
-    borderBottom: "1px solid #e5e7eb",
-    boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-    flexWrap: "wrap",
+    justifyContent:
+      "space-between",
+    alignItems:
+      "center",
+    padding:
+      "0.75rem 2rem",
+    backgroundColor:
+      "#ffffff",
+    borderBottom:
+      "1px solid #e5e7eb",
+    boxShadow:
+      "0 1px 3px rgba(0,0,0,0.05)",
+    flexWrap:
+      "wrap",
     gap: "0.75rem",
   },
+
   profileSection: {
     display: "flex",
-    alignItems: "center",
+    alignItems:
+      "center",
     gap: "0.75rem",
   },
-  profileEmoji: { fontSize: "1.4rem" },
+
+  profileEmoji: {
+    fontSize: "1.4rem",
+  },
+
   profileDetails: {
     display: "flex",
-    flexDirection: "column",
+    flexDirection:
+      "column",
     lineHeight: 1.3,
     fontSize: "0.95rem",
     color: "#000",
   },
+
   timerSection: {
     display: "flex",
-    alignItems: "center",
+    alignItems:
+      "center",
     gap: "0.5rem",
-    backgroundColor: "#f1f5f9",
-    padding: "0.3rem 1rem",
-    borderRadius: "30px",
-    border: "1px solid #e5e7eb",
+    backgroundColor:
+      "#f1f5f9",
+    padding:
+      "0.3rem 1rem",
+    borderRadius:
+      "30px",
+    border:
+      "1px solid #e5e7eb",
   },
-  timerEmoji: { fontSize: "1.2rem" },
+
+  timerEmoji: {
+    fontSize: "1.2rem",
+  },
+
   timerText: {
     fontSize: "1.2rem",
     fontWeight: 700,
-    fontVariantNumeric: "tabular-nums",
-    color: "#000",
+    fontVariantNumeric:
+      "tabular-nums",
   },
+
   primaryBtn: {
-    padding: "clamp(0.5rem, 2vw, 0.6rem) clamp(1rem, 3vw, 1.5rem)",
-    fontSize: "clamp(0.9rem, 2vw, 1rem)",
+    padding:
+      "clamp(0.5rem, 2vw, 0.6rem) clamp(1rem, 3vw, 1.5rem)",
+    fontSize:
+      "clamp(0.9rem, 2vw, 1rem)",
     fontWeight: 600,
-    backgroundColor: "#0066b3",
+    backgroundColor:
+      "#0066b3",
     color: "#fff",
     border: "none",
     borderRadius: "8px",
     cursor: "pointer",
-    boxShadow: "0 2px 8px rgba(0, 102, 179, 0.25)",
+    boxShadow:
+      "0 2px 8px rgba(0, 102, 179, 0.25)",
     width: "fit-content",
-    justifySelf: "flex-end",
   },
+
   submitBtn: {
     display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "0.3rem 1.2rem",
-    fontSize: "0.9rem",
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+    padding:
+      "0.3rem 1.2rem",
+    fontSize:
+      "0.9rem",
     fontWeight: 600,
-    backgroundColor: "#0066b3",
+    backgroundColor:
+      "#0066b3",
     color: "#fff",
     border: "none",
-    borderRadius: "30px",
-    cursor: "pointer",
-    transition: "all 0.2s",
-    boxShadow: "0 2px 8px rgba(0, 102, 179, 0.25)",
-    flex: "0 0 auto",
+    borderRadius:
+      "30px",
+    transition:
+      "all 0.2s",
+    boxShadow:
+      "0 2px 8px rgba(0, 102, 179, 0.25)",
+    flex:
+      "0 0 auto",
     width: "auto",
-    whiteSpace: "nowrap",
+    whiteSpace:
+      "nowrap",
   },
+
   progressBarContainer: {
     height: 4,
-    backgroundColor: "#e5e7eb",
+    backgroundColor:
+      "#e5e7eb",
     width: "100%",
   },
+
   progressBar: {
     height: "100%",
-    backgroundColor: "#0066b3",
-    transition: "width 0.3s ease",
+    backgroundColor:
+      "#0066b3",
+    transition:
+      "width 0.3s ease",
   },
+
   bodyRow: {
     display: "flex",
     flex: 1,
@@ -936,296 +2411,466 @@ const styles = {
     padding: "1rem",
     gap: "1rem",
   },
+
   mainContent: {
     flex: 1,
-    padding: "1.5rem 2rem",
+    padding:
+      "1.5rem 2rem",
     overflowY: "auto",
-    backgroundColor: "#ffffff",
-    borderRadius: "12px",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+    backgroundColor:
+      "#ffffff",
+    borderRadius:
+      "12px",
+    boxShadow:
+      "0 2px 8px rgba(0,0,0,0.06)",
   },
+
   questionText: {
-    fontSize: "1.15rem",
+    fontSize:
+      "1.15rem",
     lineHeight: 1.7,
-    margin: "1rem 0 0.5rem",
+    margin:
+      "1rem 0 0.5rem",
     color: "#000",
     fontWeight: 500,
   },
+
   questionImage: {
     maxWidth: "100%",
     maxHeight: "220px",
-    margin: "0.75rem 0",
-    objectFit: "contain",
-    borderRadius: "8px",
-    border: "1px solid #e5e7eb",
+    margin:
+      "0.75rem 0",
+    objectFit:
+      "contain",
+    borderRadius:
+      "8px",
+    border:
+      "1px solid #e5e7eb",
   },
+
   optionsContainer: {
     display: "flex",
-    flexDirection: "column",
-    alignItems: "flex-start",
+    flexDirection:
+      "column",
+    alignItems:
+      "flex-start",
     gap: "0.5rem",
-    margin: "1rem 0 1.5rem",
+    margin:
+      "1rem 0 1.5rem",
   },
+
   optionLabel: {
-    display: "inline-flex",
-    alignItems: "center",
+    display:
+      "inline-flex",
+    alignItems:
+      "center",
     gap: "0.75rem",
-    padding: "0.4rem 0.8rem",
-    borderRadius: "8px",
-    border: "2px solid #d1d5db",
-    cursor: "pointer",
-    transition: "all 0.15s ease",
-    fontSize: "0.95rem",
+    padding:
+      "0.4rem 0.8rem",
+    borderRadius:
+      "8px",
+    border:
+      "2px solid #d1d5db",
+    cursor:
+      "pointer",
+    transition:
+      "all 0.15s ease",
+    fontSize:
+      "0.95rem",
     color: "#000",
-    backgroundColor: "#ffffff",
     width: "auto",
     maxWidth: "100%",
-    boxSizing: "border-box",
+    boxSizing:
+      "border-box",
   },
+
   radioInput: {
-    position: "absolute",
+    position:
+      "absolute",
     opacity: 0,
     width: 0,
     height: 0,
-    pointerEvents: "none",
+    pointerEvents:
+      "none",
   },
+
   radioControl: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
+    display:
+      "inline-flex",
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
     width: 18,
     height: 18,
-    borderRadius: "50%",
-    border: "2px solid #9ca3af",
+    borderRadius:
+      "50%",
+    border:
+      "2px solid #9ca3af",
     flexShrink: 0,
-    transition: "all 0.2s",
   },
+
   radioDot: {
     width: 10,
     height: 10,
-    borderRadius: "50%",
-    backgroundColor: "transparent",
-    transition: "all 0.2s",
+    borderRadius:
+      "50%",
+    backgroundColor:
+      "transparent",
   },
+
   radioDotActive: {
     width: 10,
     height: 10,
-    borderRadius: "50%",
-    backgroundColor: "#0066b3",
+    borderRadius:
+      "50%",
+    backgroundColor:
+      "#0066b3",
   },
+
   optionText: {
-    flex: "0 1 auto",
+    flex:
+      "0 1 auto",
     lineHeight: 1.4,
     color: "#000",
-    whiteSpace: "nowrap",
+    whiteSpace:
+      "nowrap",
   },
+
   navRow: {
     display: "flex",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    alignItems: "center",
+    flexWrap:
+      "wrap",
+    justifyContent:
+      "center",
+    alignItems:
+      "center",
     gap: "0.6rem",
-    marginTop: "1.5rem",
+    marginTop:
+      "1.5rem",
   },
+
   navBtn: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "0.3rem 0.9rem",
-    fontSize: "0.85rem",
+    display:
+      "inline-flex",
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+    padding:
+      "0.3rem 0.9rem",
+    fontSize:
+      "0.85rem",
     fontWeight: 500,
-    backgroundColor: "#f1f5f9",
+    backgroundColor:
+      "#f1f5f9",
     color: "#000",
-    border: "1px solid #d1d5db",
-    borderRadius: "30px",
-    cursor: "pointer",
-    transition: "all 0.2s",
-    flex: "0 0 auto",
+    border:
+      "1px solid #d1d5db",
+    borderRadius:
+      "30px",
+    cursor:
+      "pointer",
+    transition:
+      "all 0.2s",
+    flex:
+      "0 0 auto",
     width: "auto",
-    whiteSpace: "nowrap",
+    whiteSpace:
+      "nowrap",
   },
+
   navBtnDisabled: {
-  backgroundColor: "#e5e7eb",
-  color: "#9ca3af",
-  border: "1px solid #d1d5db",
-  cursor: "not-allowed",
-  opacity: 0.6,
-  boxShadow: "none",
-},
-  clearBtn: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "0.3rem 0.9rem",
-    fontSize: "0.85rem",
-    fontWeight: 500,
-    backgroundColor: "#fef3c7",
-    color: "#000",
-    border: "1px solid #fcd34d",
-    borderRadius: "30px",
-    cursor: "pointer",
-    transition: "all 0.2s",
-    flex: "0 0 auto",
-    width: "auto",
-    whiteSpace: "nowrap",
+    backgroundColor:
+      "#e5e7eb",
+    color: "#9ca3af",
+    border:
+      "1px solid #d1d5db",
+    cursor:
+      "not-allowed",
+    opacity: 0.6,
+    boxShadow:
+      "none",
   },
+
+  clearBtn: {
+    display:
+      "inline-flex",
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+    padding:
+      "0.3rem 0.9rem",
+    fontSize:
+      "0.85rem",
+    fontWeight: 500,
+    backgroundColor:
+      "#fef3c7",
+    color: "#000",
+    border:
+      "1px solid #fcd34d",
+    borderRadius:
+      "30px",
+    cursor:
+      "pointer",
+    transition:
+      "all 0.2s",
+    flex:
+      "0 0 auto",
+    width: "auto",
+    whiteSpace:
+      "nowrap",
+  },
+
+  clearBtnDisabled: {
+    opacity: 0.5,
+    cursor:
+      "not-allowed",
+  },
+
   sidebar: {
     width: 220,
-    backgroundColor: "#ffffff",
-    borderRadius: "12px",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-    padding: "1.2rem 1rem",
+    backgroundColor:
+      "#ffffff",
+    borderRadius:
+      "12px",
+    boxShadow:
+      "0 2px 8px rgba(0,0,0,0.06)",
+    padding:
+      "1.2rem 1rem",
     overflowY: "auto",
     display: "flex",
-    flexDirection: "column",
+    flexDirection:
+      "column",
   },
+
   paletteGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(4, 1fr)",
+    gridTemplateColumns:
+      "repeat(4, 1fr)",
     gap: "0.5rem",
-    margin: "0.5rem 0 1rem",
+    margin:
+      "0.5rem 0 1rem",
   },
+
   paletteItem: {
     width: "40px",
     height: "40px",
     display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "8px",
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+    borderRadius:
+      "8px",
     fontWeight: 600,
-    fontSize: "0.85rem",
-    margin: "0 auto",
-    transition: "all 0.15s ease",
-    color: "#000",
+    fontSize:
+      "0.85rem",
+    margin:
+      "0 auto",
+    transition:
+      "all 0.15s ease",
   },
+
   sidebarFooter: {
-    borderTop: "1px solid #e5e7eb",
-    paddingTop: "0.75rem",
-    fontSize: "0.85rem",
+    borderTop:
+      "1px solid #e5e7eb",
+    paddingTop:
+      "0.75rem",
+    fontSize:
+      "0.85rem",
     display: "flex",
-    flexDirection: "column",
+    flexDirection:
+      "column",
     gap: "0.4rem",
     color: "#000",
   },
+
   dot: {
-    display: "inline-block",
+    display:
+      "inline-block",
     width: 12,
     height: 12,
-    borderRadius: "50%",
+    borderRadius:
+      "50%",
     marginRight: 6,
   },
+
   loadingOverlay: {
     display: "flex",
-    flexDirection: "column",
-    justifyContent: "center",
-    alignItems: "center",
+    flexDirection:
+      "column",
+    justifyContent:
+      "center",
+    alignItems:
+      "center",
     height: "100vh",
-    fontFamily: "'Segoe UI', Roboto, system-ui, sans-serif",
-    backgroundColor: "#f8fafc",
+    fontFamily:
+      "'Segoe UI', Roboto, system-ui, sans-serif",
+    backgroundColor:
+      "#f8fafc",
   },
-  blurredQuiz: {
-    position: "absolute",
-    inset: 0,
-    background: "#f5f7fb",
-    filter: "blur(8px)",
-    transform: "scale(1.04)",
-    opacity: 0.9,
-    zIndex: 0,
-    overflow: "hidden",
-  },
+
   fakeHeader: {
     height: 70,
-    background: "#ffffff",
+    background:
+      "#ffffff",
     display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "0 30px",
-    borderBottom: "1px solid #ddd",
+    alignItems:
+      "center",
+    justifyContent:
+      "space-between",
+    padding:
+      "0 30px",
+    borderBottom:
+      "1px solid #ddd",
   },
+
   fakeLogo: {
     width: 180,
     height: 28,
     borderRadius: 6,
-    background: "#d8dce6",
+    background:
+      "#d8dce6",
   },
+
   fakeStudent: {
     width: 250,
   },
+
   fakeTimer: {
     width: 80,
     height: 40,
     borderRadius: 8,
-    background: "#d8dce6",
+    background:
+      "#d8dce6",
   },
+
   fakeBody: {
     display: "flex",
     padding: 30,
     gap: 30,
   },
+
   fakeQuestionCard: {
     flex: 1,
-    background: "#fff",
-    borderRadius: 14,
+    background:
+      "#fff",
+    borderRadius:
+      14,
     padding: 30,
-    boxShadow: "0 8px 30px rgba(0,0,0,.08)",
+    boxShadow:
+      "0 8px 30px rgba(0,0,0,.08)",
   },
+
   fakeSidebar: {
     width: 240,
-    background: "#fff",
-    borderRadius: 14,
+    background:
+      "#fff",
+    borderRadius:
+      14,
     padding: 20,
     display: "grid",
-    gridTemplateColumns: "repeat(5,1fr)",
+    gridTemplateColumns:
+      "repeat(5,1fr)",
     gap: 12,
   },
+
   fakePalette: {
     width: 36,
     height: 36,
     borderRadius: 6,
-    background: "#d8dce6",
+    background:
+      "#d8dce6",
   },
+
   fakeLine: {
     height: 18,
-    background: "#d8dce6",
+    background:
+      "#d8dce6",
     borderRadius: 10,
   },
+
   fakeOption: {
     display: "flex",
-    alignItems: "center",
+    alignItems:
+      "center",
     gap: 15,
     marginBottom: 18,
   },
+
   fakeRadio: {
     width: 20,
     height: 20,
-    borderRadius: "50%",
-    background: "#d8dce6",
+    borderRadius:
+      "50%",
+    background:
+      "#d8dce6",
   },
+
   fakeButtons: {
     display: "flex",
-    justifyContent: "space-between",
+    justifyContent:
+      "space-between",
   },
+
   fakeButton: {
     width: 120,
     height: 42,
     borderRadius: 8,
-    background: "#d8dce6",
+    background:
+      "#d8dce6",
   },
 };
 
-// Inject animations globally
-const styleSheet = document.createElement("style");
-styleSheet.textContent = `
-  @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-  @keyframes tilt {
-    0%   { transform: rotate(0deg); }
-    50%  { transform: rotate(90deg); }
-    100% { transform: rotate(0deg); }
-  }
-`;
-document.head.appendChild(styleSheet);
+// ============================================================
+// GLOBAL ANIMATIONS
+// ============================================================
+
+if (
+  typeof document !== "undefined" &&
+  !document.getElementById(
+    "quiz-page-global-styles"
+  )
+) {
+  const styleSheet =
+    document.createElement(
+      "style"
+    );
+
+  styleSheet.id =
+    "quiz-page-global-styles";
+
+  styleSheet.textContent = `
+    @keyframes spin {
+      from {
+        transform: rotate(0deg);
+      }
+
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @keyframes tilt {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      50% {
+        transform: rotate(90deg);
+      }
+
+      100% {
+        transform: rotate(0deg);
+      }
+    }
+  `;
+
+  document.head.appendChild(
+    styleSheet
+  );
+}
 
 export default QuizPage;
