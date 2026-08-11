@@ -1,4 +1,4 @@
- import React, {
+  import React, {
   useEffect,
   useState,
   useRef,
@@ -128,15 +128,6 @@ function QuizPage() {
     useRef(false);
 
   /*
-   * Prevent a manual submit and timer auto-submit from
-   * entering submitQuiz at the same time. React state updates
-   * are asynchronous, so submitted/submitting alone are not
-   * sufficient as a synchronous lock.
-   */
-  const submitRequestInProgress =
-    useRef(false);
-
-  /*
    * ----------------------------------------------------------
    * SERVER CLOCK SYNCHRONIZATION
    * ----------------------------------------------------------
@@ -157,9 +148,6 @@ function QuizPage() {
 
   const lastServerSyncRef = useRef(0);
 
-  /* Prevent overlapping /quiz-status + /servertime polls. */
-  const statusRequestInProgress = useRef(false);
-
   // ------------------------------------------------------------
   // SERVER-SYNCHRONIZED NOW
   // ------------------------------------------------------------
@@ -177,54 +165,33 @@ function QuizPage() {
   // ------------------------------------------------------------
 
   const enterFullscreen =
-    useCallback(async () => {
+    useCallback(() => {
       const elem = document.documentElement;
 
-      try {
-        const alreadyFullscreen = !!(
-          document.fullscreenElement ||
-          document.webkitFullscreenElement ||
-          document.mozFullScreenElement ||
-          document.msFullscreenElement
-        );
+      if (
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement
+      ) {
+        return;
+      }
 
-        if (!alreadyFullscreen) {
-          if (elem.requestFullscreen) {
-            await elem.requestFullscreen();
-          } else if (elem.webkitRequestFullscreen) {
-            elem.webkitRequestFullscreen();
-          } else if (elem.msRequestFullscreen) {
-            elem.msRequestFullscreen();
-          }
-        }
-
-        /*
-         * Orientation locking is supported only by some browsers,
-         * and normally requires fullscreen. Never make fullscreen
-         * or the quiz fail just because orientation locking is not
-         * supported. The existing portrait overlay remains the
-         * fallback on unsupported browsers.
-         */
-        try {
-          if (
-            screen.orientation &&
-            screen.orientation.lock
-          ) {
-            await screen.orientation.lock(
-              "landscape"
-            );
-          }
-        } catch (orientationError) {
-          console.warn(
-            "Could not lock landscape orientation:",
-            orientationError
+      if (elem.requestFullscreen) {
+        elem.requestFullscreen().catch((err) => {
+          console.error(
+            "Fullscreen request failed:",
+            err
           );
-        }
-      } catch (err) {
-        console.error(
-          "Fullscreen request failed:",
-          err
-        );
+        });
+      } else if (
+        elem.webkitRequestFullscreen
+      ) {
+        elem.webkitRequestFullscreen();
+      } else if (
+        elem.msRequestFullscreen
+      ) {
+        elem.msRequestFullscreen();
       }
     }, []);
 
@@ -299,79 +266,6 @@ function QuizPage() {
         "MSFullscreenChange",
         handleFullscreenChange
       );
-    };
-  }, []);
-
-  // ------------------------------------------------------------
-  // LOCK LANDSCAPE DURING QUIZ
-  // ------------------------------------------------------------
-  //
-  // The browser can only enforce orientation on browsers that
-  // expose Screen Orientation Lock, normally while fullscreen.
-  // Unsupported browsers fall back to the existing portrait
-  // overlay below.
-  // ------------------------------------------------------------
-
-  useEffect(() => {
-    if (!quizActive || submitted) {
-      return;
-    }
-
-    let cancelled = false;
-
-    const lockLandscape = async () => {
-      if (
-        !document.fullscreenElement &&
-        !document.webkitFullscreenElement
-      ) {
-        return;
-      }
-
-      try {
-        if (
-          screen.orientation &&
-          screen.orientation.lock
-        ) {
-          await screen.orientation.lock(
-            "landscape"
-          );
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.warn(
-            "Could not lock landscape orientation:",
-            err
-          );
-        }
-      }
-    };
-
-    lockLandscape();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [quizActive, submitted]);
-
-  // ------------------------------------------------------------
-  // UNLOCK ORIENTATION AFTER QUIZ
-  // ------------------------------------------------------------
-
-  useEffect(() => {
-    return () => {
-      try {
-        if (
-          screen.orientation &&
-          screen.orientation.unlock
-        ) {
-          screen.orientation.unlock();
-        }
-      } catch (err) {
-        console.warn(
-          "Could not unlock orientation:",
-          err
-        );
-      }
     };
   }, []);
 
@@ -469,16 +363,6 @@ function QuizPage() {
     let cancelled = false;
 
     const checkStatus = async () => {
-      if (
-        statusRequestInProgress.current ||
-        cancelled ||
-        submitRequestInProgress.current
-      ) {
-        return;
-      }
-
-      statusRequestInProgress.current = true;
-
       try {
         /*
          * Record request start time.
@@ -488,52 +372,26 @@ function QuizPage() {
         const requestStartedAt =
           Date.now();
 
-        /*
-         * /quiz-status controls exam state.
-         * /servertime gives an explicit server clock because the
-         * browser cannot reliably read the HTTP Date header across
-         * origins unless the backend exposes that header.
-         */
-        const [statusRes, serverTimeRes] =
-          await Promise.all([
-            fetch(
-              `${API_BASE}/quiz-status`,
-              {
-                cache: "no-store",
-              }
-            ),
-            fetch(
-              `${API_BASE}/servertime`,
-              {
-                cache: "no-store",
-              }
-            ),
-          ]);
+        const res = await fetch(
+          `${API_BASE}/quiz-status`,
+          {
+            cache: "no-store",
+          }
+        );
 
         const requestFinishedAt =
           Date.now();
 
-        if (!statusRes.ok) {
+        if (!res.ok) {
           throw new Error(
-            `Quiz status request failed (${statusRes.status})`
+            `Quiz status request failed (${res.status})`
           );
         }
 
         const data =
-          await statusRes.json();
+          await res.json();
 
-        let serverTimeData = null;
-
-        if (serverTimeRes.ok) {
-          try {
-            serverTimeData =
-              await serverTimeRes.json();
-          } catch {
-            serverTimeData = null;
-          }
-        }
-
-        if (cancelled || submitRequestInProgress.current) {
+        if (cancelled) {
           return;
         }
 
@@ -558,8 +416,6 @@ function QuizPage() {
         let serverNow = null;
 
         const possibleServerTime =
-          serverTimeData?.serverTimeUTC ??
-          serverTimeData?.serverTime ??
           data?.serverTime ??
           data?.currentTime ??
           data?.now;
@@ -585,7 +441,7 @@ function QuizPage() {
          */
         if (serverNow === null) {
           const dateHeader =
-            statusRes.headers.get(
+            res.headers.get(
               "date"
             );
 
@@ -612,11 +468,7 @@ function QuizPage() {
          * Middle of request is used as approximate moment
          * at which server response was generated.
          */
-        if (
-          serverNow !== null &&
-          requestFinishedAt >=
-            lastServerSyncRef.current
-        ) {
+        if (serverNow !== null) {
           const estimatedClientNow =
             requestStartedAt +
             (requestFinishedAt -
@@ -735,8 +587,7 @@ function QuizPage() {
         if (data.hasEnded) {
           if (
             !autoSubmitted.current &&
-            !submitting &&
-            !submitRequestInProgress.current
+            !submitting
           ) {
             alert(
               "The quiz has ended. You cannot take it now."
@@ -788,9 +639,6 @@ function QuizPage() {
          *
          * The next request can recover.
          */
-      } finally {
-        statusRequestInProgress.current =
-          false;
       }
     };
 
@@ -966,9 +814,6 @@ function QuizPage() {
             )
           );
         }
-
-        autoSubmitted.current = false;
-        submitRequestInProgress.current = false;
 
         setStartChecked(
           true
@@ -1198,17 +1043,11 @@ function QuizPage() {
   const submitQuiz =
     useCallback(
       async (auto = false) => {
-        /*
-         * IMPORTANT: use a ref as the first synchronous guard.
-         * This prevents the timer and the Submit button from
-         * sending two /submit-quiz requests during the same
-         * render cycle.
-         */
-        if (submitRequestInProgress.current) {
+        if (submitted) {
           return;
         }
 
-        if (submitted || submitting) {
+        if (submitting) {
           return;
         }
 
@@ -1222,9 +1061,6 @@ function QuizPage() {
             return;
           }
         }
-
-        /* Lock BEFORE any async work starts. */
-        submitRequestInProgress.current = true;
 
         setSubmitted(true);
         setSubmitting(true);
@@ -1285,7 +1121,6 @@ function QuizPage() {
                   "Content-Type":
                     "application/json",
                 },
-                cache: "no-store",
                 body: JSON.stringify(
                   {
                     regNo:
@@ -1298,65 +1133,33 @@ function QuizPage() {
               }
             );
 
-          let data = null;
-
-          try {
-            data = await res.json();
-          } catch {
-            data = null;
-          }
+          const data =
+            await res.json();
 
           if (!res.ok) {
-            /*
-             * A 404 after an otherwise valid active attempt can
-             * happen if the server has already accepted a previous
-             * request. Do not silently treat it as success, but
-             * expose the real backend message instead of the vague
-             * generic error.
-             */
-            const message =
+            throw new Error(
               data?.message ||
-              `Submission failed (HTTP ${res.status}).`;
-
-            throw new Error(message);
+                "Submission failed."
+            );
           }
 
           /*
-           * Backend is authoritative for disqualification.
-           * Keep this compatibility fallback only when the timer
-           * itself reached zero.
+           * Backend already handles auto-submission.
+           *
+           * Keep frontend compatibility flag.
            */
           if (
             auto &&
-            timeLeft <= 0 &&
-            data &&
-            data.disqualified === undefined
+            timeLeft <= 0
           ) {
-            data.disqualified = true;
-          }
-
-          // Unlock orientation before leaving the result page.
-          try {
-            if (
-              screen.orientation &&
-              screen.orientation.unlock
-            ) {
-              screen.orientation.unlock();
-            }
-          } catch (orientationError) {
-            console.log(
-              "Could not unlock orientation:",
-              orientationError
-            );
+            data.disqualified =
+              true;
           }
 
           // Exit fullscreen
           try {
             if (
-              (
-                document.fullscreenElement ||
-                document.webkitFullscreenElement
-              ) &&
+              document.fullscreenElement &&
               document.exitFullscreen
             ) {
               await document.exitFullscreen();
@@ -1370,42 +1173,37 @@ function QuizPage() {
             );
           }
 
-          navigate(
-            "/result",
-            {
-              replace: true,
-              state: {
-                ...(data || {}),
-                student,
-                totalQuestions:
-                  questions.length,
-              },
-            }
-          );
+          navigate("/result", {
+            replace: true,
+            state: {
+              ...data,
+              student,
+              totalQuestions:
+                questions.length,
+            },
+          });
         } catch (err) {
           console.error(
             "Submission error:",
             err
           );
 
-          /*
-           * The request did not complete successfully from the
-           * frontend's point of view, so allow one later retry.
-           * The backend remains authoritative about whether an
-           * attempt was actually submitted.
-           */
           alert(
             "Submission failed: " +
               (err.message ||
                 "Unknown error")
           );
 
+          /*
+           * Allow retry if actual submission failed.
+           */
           setSubmitted(false);
           setSubmitting(false);
-        } finally {
-          /* Always release the synchronous React race lock. */
-          submitRequestInProgress.current =
-            false;
+
+          /*
+           * Status polling is recreated by the effect
+           * because submitted becomes false again.
+           */
         }
       },
       [
@@ -1435,8 +1233,7 @@ function QuizPage() {
   const handleTimeExpired =
     useCallback(() => {
       if (
-        autoSubmitted.current ||
-        submitRequestInProgress.current
+        autoSubmitted.current
       ) {
         return;
       }
