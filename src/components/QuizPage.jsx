@@ -1,4 +1,4 @@
-import React, {
+ import React, {
   useEffect,
   useState,
   useRef,
@@ -6,7 +6,12 @@ import React, {
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
-const API_BASE = "https://quizappbackend-k09m.onrender.com";
+const API_BASE =
+  "https://quizappbackend-k09m.onrender.com";
+
+// ============================================================
+// HELPERS
+// ============================================================
 
 const shuffleArray = (array) => {
   const newArray = [...array];
@@ -14,11 +19,18 @@ const shuffleArray = (array) => {
   for (let i = newArray.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
 
-    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+    [newArray[i], newArray[j]] = [
+      newArray[j],
+      newArray[i],
+    ];
   }
 
   return newArray;
 };
+
+// ============================================================
+// COMPONENT
+// ============================================================
 
 function QuizPage() {
   const navigate = useNavigate();
@@ -27,17 +39,17 @@ function QuizPage() {
   const student = state?.student;
 
   /*
-   * IMPORTANT:
    * Do NOT use examStartTime from navigation state as the
    * authoritative exam time.
    *
-   * The backend /quiz-status endpoint is authoritative.
+   * Backend /quiz-status remains authoritative.
    */
   const initialExamStartTime = state?.examStartTime
     ? new Date(state.examStartTime)
     : null;
 
-  const initialExamDuration = state?.examDuration || 30;
+  const initialExamDuration =
+    state?.examDuration || 30;
 
   // ------------------------------------------------------------
   // STATE
@@ -57,38 +69,44 @@ function QuizPage() {
   const [submitting, setSubmitting] = useState(false);
 
   /*
-   * quizActive means:
-   * The backend says the scheduled exam is currently open.
-   *
-   * It does NOT mean /start-quiz has already been called.
+   * Backend says whether scheduled exam is currently open.
    */
-  const [quizActive, setQuizActive] = useState(false);
+  const [quizActive, setQuizActive] =
+    useState(false);
 
   const [waitTime, setWaitTime] = useState(null);
 
-  const [loadingQuestions, setLoadingQuestions] = useState(false);
-  const [questionsError, setQuestionsError] = useState(null);
+  const [loadingQuestions, setLoadingQuestions] =
+    useState(false);
 
-  const [isLandscape, setIsLandscape] = useState(true);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [questionsError, setQuestionsError] =
+    useState(null);
+
+  const [isLandscape, setIsLandscape] =
+    useState(true);
+
+  const [isFullscreen, setIsFullscreen] =
+    useState(false);
 
   /*
-   * This prevents multiple calls to /start-quiz.
+   * Prevent multiple /start-quiz calls.
    */
-  const [startChecked, setStartChecked] = useState(false);
+  const [startChecked, setStartChecked] =
+    useState(false);
 
   /*
    * Server-controlled exam times.
    */
-  const [serverStartTime, setServerStartTime] = useState(
-    initialExamStartTime
-  );
+  const [serverStartTime, setServerStartTime] =
+    useState(initialExamStartTime);
 
-  const [serverEndTime, setServerEndTime] = useState(null);
+  const [serverEndTime, setServerEndTime] =
+    useState(null);
 
-  const [serverDurationMinutes, setServerDurationMinutes] = useState(
-    initialExamDuration
-  );
+  const [
+    serverDurationMinutes,
+    setServerDurationMinutes,
+  ] = useState(initialExamDuration);
 
   // ------------------------------------------------------------
   // REFS
@@ -106,29 +124,76 @@ function QuizPage() {
    * Prevent duplicate start requests even if React effects
    * are triggered more than once.
    */
-  const startRequestInProgress = useRef(false);
+  const startRequestInProgress =
+    useRef(false);
+
+  /*
+   * ----------------------------------------------------------
+   * SERVER CLOCK SYNCHRONIZATION
+   * ----------------------------------------------------------
+   *
+   * serverClockOffsetRef:
+   *
+   *   server time - browser time
+   *
+   * If browser clock is 2 minutes fast:
+   *
+   *   offset = -120000
+   *
+   * If browser clock is 2 minutes slow:
+   *
+   *   offset = +120000
+   */
+  const serverClockOffsetRef = useRef(0);
+
+  const lastServerSyncRef = useRef(0);
+
+  // ------------------------------------------------------------
+  // SERVER-SYNCHRONIZED NOW
+  // ------------------------------------------------------------
+
+  const getServerSyncedNow =
+    useCallback(() => {
+      return (
+        Date.now() +
+        serverClockOffsetRef.current
+      );
+    }, []);
 
   // ------------------------------------------------------------
   // FULLSCREEN
   // ------------------------------------------------------------
 
-  const enterFullscreen = useCallback(() => {
-    const elem = document.documentElement;
+  const enterFullscreen =
+    useCallback(() => {
+      const elem = document.documentElement;
 
-    if (document.fullscreenElement) {
-      return;
-    }
+      if (
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement
+      ) {
+        return;
+      }
 
-    if (elem.requestFullscreen) {
-      elem.requestFullscreen().catch((err) => {
-        console.error("Fullscreen request failed:", err);
-      });
-    } else if (elem.webkitRequestFullscreen) {
-      elem.webkitRequestFullscreen();
-    } else if (elem.msRequestFullscreen) {
-      elem.msRequestFullscreen();
-    }
-  }, []);
+      if (elem.requestFullscreen) {
+        elem.requestFullscreen().catch((err) => {
+          console.error(
+            "Fullscreen request failed:",
+            err
+          );
+        });
+      } else if (
+        elem.webkitRequestFullscreen
+      ) {
+        elem.webkitRequestFullscreen();
+      } else if (
+        elem.msRequestFullscreen
+      ) {
+        elem.msRequestFullscreen();
+      }
+    }, []);
 
   // ------------------------------------------------------------
   // REDIRECT IF NO STUDENT
@@ -136,7 +201,9 @@ function QuizPage() {
 
   useEffect(() => {
     if (!student) {
-      navigate("/login", { replace: true });
+      navigate("/login", {
+        replace: true,
+      });
     }
   }, [student, navigate]);
 
@@ -146,14 +213,17 @@ function QuizPage() {
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      const currentlyFullscreen = !!(
-        document.fullscreenElement ||
-        document.webkitFullscreenElement ||
-        document.mozFullScreenElement ||
-        document.msFullscreenElement
-      );
+      const currentlyFullscreen =
+        !!(
+          document.fullscreenElement ||
+          document.webkitFullscreenElement ||
+          document.mozFullScreenElement ||
+          document.msFullscreenElement
+        );
 
-      setIsFullscreen(currentlyFullscreen);
+      setIsFullscreen(
+        currentlyFullscreen
+      );
     };
 
     document.addEventListener(
@@ -206,14 +276,20 @@ function QuizPage() {
   useEffect(() => {
     const checkOrientation = () => {
       const isLandscapeNow =
-        window.matchMedia("(orientation: landscape)").matches ||
+        window.matchMedia(
+          "(orientation: landscape)"
+        ).matches ||
         (
-          window.screen?.orientation?.type?.startsWith("landscape") ??
-          false
+          window.screen?.orientation?.type?.startsWith(
+            "landscape"
+          ) ?? false
         ) ||
-        window.innerWidth > window.innerHeight;
+        window.innerWidth >
+          window.innerHeight;
 
-      setIsLandscape(isLandscapeNow);
+      setIsLandscape(
+        isLandscapeNow
+      );
     };
 
     checkOrientation();
@@ -250,7 +326,9 @@ function QuizPage() {
         handleChange
       );
 
-      if (window.screen?.orientation) {
+      if (
+        window.screen?.orientation
+      ) {
         window.screen.orientation.removeEventListener(
           "change",
           handleChange
@@ -259,14 +337,23 @@ function QuizPage() {
     };
   }, []);
 
-  // ------------------------------------------------------------
-  // CHECK EXAM STATUS
+  // ============================================================
+  // CHECK EXAM STATUS + SERVER CLOCK SYNC
+  // ============================================================
   //
   // IMPORTANT:
+  //
   // We check /quiz-status FIRST.
   //
   // We do NOT call /start-quiz while waiting.
-  // ------------------------------------------------------------
+  //
+  // IMPORTANT FIX:
+  //
+  // We CONTINUE polling after the quiz opens.
+  //
+  // This keeps the browser synchronized with backend time
+  // during the entire exam.
+  // ============================================================
 
   useEffect(() => {
     if (!student || submitted) {
@@ -277,6 +364,14 @@ function QuizPage() {
 
     const checkStatus = async () => {
       try {
+        /*
+         * Record request start time.
+         *
+         * Used to compensate approximately for network latency.
+         */
+        const requestStartedAt =
+          Date.now();
+
         const res = await fetch(
           `${API_BASE}/quiz-status`,
           {
@@ -284,21 +379,113 @@ function QuizPage() {
           }
         );
 
+        const requestFinishedAt =
+          Date.now();
+
         if (!res.ok) {
           throw new Error(
             `Quiz status request failed (${res.status})`
           );
         }
 
-        const data = await res.json();
+        const data =
+          await res.json();
 
         if (cancelled) {
           return;
         }
 
-        // --------------------------------------------------------
+        // ------------------------------------------------------
+        // SERVER CLOCK SYNC
+        // ------------------------------------------------------
+        //
+        // Preferred:
+        //
+        //   data.serverTime
+        //
+        // Also supports:
+        //
+        //   data.currentTime
+        //   data.now
+        //
+        // Fallback:
+        //
+        //   HTTP Date header
+        // ------------------------------------------------------
+
+        let serverNow = null;
+
+        const possibleServerTime =
+          data?.serverTime ??
+          data?.currentTime ??
+          data?.now;
+
+        if (possibleServerTime) {
+          const parsedServerTime =
+            new Date(
+              possibleServerTime
+            ).getTime();
+
+          if (
+            !Number.isNaN(
+              parsedServerTime
+            )
+          ) {
+            serverNow =
+              parsedServerTime;
+          }
+        }
+
+        /*
+         * Fallback to HTTP Date header.
+         */
+        if (serverNow === null) {
+          const dateHeader =
+            res.headers.get(
+              "date"
+            );
+
+          if (dateHeader) {
+            const parsedHeaderTime =
+              new Date(
+                dateHeader
+              ).getTime();
+
+            if (
+              !Number.isNaN(
+                parsedHeaderTime
+              )
+            ) {
+              serverNow =
+                parsedHeaderTime;
+            }
+          }
+        }
+
+        /*
+         * Calculate clock offset.
+         *
+         * Middle of request is used as approximate moment
+         * at which server response was generated.
+         */
+        if (serverNow !== null) {
+          const estimatedClientNow =
+            requestStartedAt +
+            (requestFinishedAt -
+              requestStartedAt) /
+              2;
+
+          serverClockOffsetRef.current =
+            serverNow -
+            estimatedClientNow;
+
+          lastServerSyncRef.current =
+            requestFinishedAt;
+        }
+
+        // ------------------------------------------------------
         // SERVER TIMES
-        // --------------------------------------------------------
+        // ------------------------------------------------------
 
         const start = data.startTime
           ? new Date(data.startTime)
@@ -308,90 +495,136 @@ function QuizPage() {
           ? new Date(data.endTime)
           : null;
 
-        if (start && !Number.isNaN(start.getTime())) {
-          setServerStartTime(start);
-        }
-
-        if (end && !Number.isNaN(end.getTime())) {
-          setServerEndTime(end);
-        }
-
         if (
-          data.durationMinutes !== undefined &&
-          data.durationMinutes !== null
+          start &&
+          !Number.isNaN(
+            start.getTime()
+          )
         ) {
-          setServerDurationMinutes(
-            Number(data.durationMinutes)
+          setServerStartTime(
+            start
           );
         }
 
-        // --------------------------------------------------------
+        if (
+          end &&
+          !Number.isNaN(
+            end.getTime()
+          )
+        ) {
+          setServerEndTime(
+            end
+          );
+        }
+
+        if (
+          data.durationMinutes !==
+            undefined &&
+          data.durationMinutes !==
+            null
+        ) {
+          setServerDurationMinutes(
+            Number(
+              data.durationMinutes
+            )
+          );
+        }
+
+        // ------------------------------------------------------
         // QUIZ IS OPEN
-        // --------------------------------------------------------
+        // ------------------------------------------------------
 
         if (data.isQuizOpen) {
           setQuizActive(true);
 
           /*
-           * Calculate remaining time from the SERVER end time.
-           *
-           * This prevents the countdown from starting before
-           * the scheduled exam start.
+           * Immediately synchronize timer from backend
+           * endTime.
            */
-          if (end && !Number.isNaN(end.getTime())) {
-            const now = Date.now();
+          if (
+            end &&
+            !Number.isNaN(
+              end.getTime()
+            )
+          ) {
+            const now =
+              getServerSyncedNow();
 
-            const remaining = Math.max(
-              0,
-              Math.ceil((end.getTime() - now) / 1000)
+            const remaining =
+              Math.max(
+                0,
+                Math.ceil(
+                  (end.getTime() -
+                    now) /
+                    1000
+                )
+              );
+
+            setTimeLeft(
+              remaining
             );
-
-            setTimeLeft(remaining);
           }
 
           /*
-           * STOP status polling once the quiz is open.
+           * IMPORTANT:
            *
-           * The timer itself will handle the remaining time.
+           * DO NOT STOP POLLING HERE.
+           *
+           * Previous code cleared statusIntervalRef here.
+           *
+           * That meant the timer depended only on the
+           * student's local Date.now() after entering the quiz.
+           *
+           * We keep polling so server clock stays synchronized.
            */
-          if (statusIntervalRef.current) {
-            clearInterval(statusIntervalRef.current);
-
-            statusIntervalRef.current = null;
-          }
-
           return;
         }
 
-        // --------------------------------------------------------
+        // ------------------------------------------------------
         // QUIZ HAS ENDED
-        // --------------------------------------------------------
+        // ------------------------------------------------------
 
         if (data.hasEnded) {
-          if (!autoSubmitted.current && !submitting) {
+          if (
+            !autoSubmitted.current &&
+            !submitting
+          ) {
             alert(
               "The quiz has ended. You cannot take it now."
             );
 
-            navigate("/login", { replace: true });
+            navigate("/login", {
+              replace: true,
+            });
           }
 
           return;
         }
 
-        // --------------------------------------------------------
+        // ------------------------------------------------------
         // QUIZ HAS NOT STARTED
-        // --------------------------------------------------------
+        // ------------------------------------------------------
 
         setQuizActive(false);
 
-        if (start && !Number.isNaN(start.getTime())) {
-          const now = Date.now();
+        if (
+          start &&
+          !Number.isNaN(
+            start.getTime()
+          )
+        ) {
+          const now =
+            getServerSyncedNow();
 
-          const diff = Math.max(
-            0,
-            Math.ceil((start.getTime() - now) / 1000)
-          );
+          const diff =
+            Math.max(
+              0,
+              Math.ceil(
+                (start.getTime() -
+                  now) /
+                  1000
+              )
+            );
 
           setWaitTime(diff);
         }
@@ -402,10 +635,9 @@ function QuizPage() {
         );
 
         /*
-         * Do NOT redirect just because one status request
-         * temporarily fails.
+         * Do NOT redirect because one request failed.
          *
-         * The next polling request can recover.
+         * The next request can recover.
          */
       }
     };
@@ -416,20 +648,35 @@ function QuizPage() {
     checkStatus();
 
     /*
-     * While waiting, check every second.
+     * Continue checking every second.
+     *
+     * Before quiz:
+     *   detects scheduled opening.
+     *
+     * During quiz:
+     *   synchronizes server clock.
+     *
+     * After quiz:
+     *   detects server ending.
      */
-    statusIntervalRef.current = setInterval(
-      checkStatus,
-      1000
-    );
+    statusIntervalRef.current =
+      setInterval(
+        checkStatus,
+        1000
+      );
 
     return () => {
       cancelled = true;
 
-      if (statusIntervalRef.current) {
-        clearInterval(statusIntervalRef.current);
+      if (
+        statusIntervalRef.current
+      ) {
+        clearInterval(
+          statusIntervalRef.current
+        );
 
-        statusIntervalRef.current = null;
+        statusIntervalRef.current =
+          null;
       }
     };
   }, [
@@ -437,17 +684,17 @@ function QuizPage() {
     submitted,
     submitting,
     navigate,
+    getServerSyncedNow,
   ]);
 
-  // ------------------------------------------------------------
+  // ============================================================
   // START QUIZ
+  // ============================================================
   //
-  // IMPORTANT:
-  // This only runs AFTER /quiz-status says the quiz is open.
+  // ONLY runs after /quiz-status says the quiz is open.
   //
-  // /start-quiz creates the student's QuizAttempt in backend,
-  // so it must NEVER be called during the waiting period.
-  // ------------------------------------------------------------
+  // No start request during waiting.
+  // ============================================================
 
   useEffect(() => {
     if (!student) {
@@ -462,14 +709,17 @@ function QuizPage() {
       return;
     }
 
-    if (startRequestInProgress.current) {
+    if (
+      startRequestInProgress.current
+    ) {
       return;
     }
 
     let cancelled = false;
 
     const startQuiz = async () => {
-      startRequestInProgress.current = true;
+      startRequestInProgress.current =
+        true;
 
       try {
         const res = await fetch(
@@ -477,16 +727,19 @@ function QuizPage() {
           {
             method: "POST",
             headers: {
-              "Content-Type": "application/json",
+              "Content-Type":
+                "application/json",
             },
             cache: "no-store",
             body: JSON.stringify({
-              regNo: student.regNo,
+              regNo:
+                student.regNo,
             }),
           }
         );
 
-        const data = await res.json();
+        const data =
+          await res.json();
 
         if (cancelled) {
           return;
@@ -502,7 +755,9 @@ function QuizPage() {
               "You have already submitted this quiz. You cannot start again."
           );
 
-          navigate("/login", { replace: true });
+          navigate("/login", {
+            replace: true,
+          });
 
           return;
         }
@@ -511,7 +766,10 @@ function QuizPage() {
         // OTHER SERVER ERROR
         // ------------------------------------------------------
 
-        if (!res.ok || !data.success) {
+        if (
+          !res.ok ||
+          !data.success
+        ) {
           throw new Error(
             data?.message ||
               "Could not start the quiz."
@@ -519,38 +777,47 @@ function QuizPage() {
         }
 
         /*
-         * Backend returns the attempt's startTime and
-         * durationMinutes.
+         * Backend returns attempt startTime and duration.
          *
-         * Since we only call this after the scheduled quiz
-         * is open, this attempt start should be valid.
+         * We intentionally do not replace server scheduled
+         * exam start with a frontend timestamp.
          */
         if (data.startTime) {
-          const attemptStart = new Date(
-            data.startTime
-          );
+          const attemptStart =
+            new Date(
+              data.startTime
+            );
 
-          if (!Number.isNaN(attemptStart.getTime())) {
+          if (
+            !Number.isNaN(
+              attemptStart.getTime()
+            )
+          ) {
             /*
-             * Keep the server scheduled start as the
-             * authoritative exam start.
+             * Server value accepted.
              *
-             * We don't replace it with an arbitrary
-             * frontend timestamp.
+             * /quiz-status remains authoritative for
+             * the actual exam window.
              */
           }
         }
 
         if (
-          data.durationMinutes !== undefined &&
-          data.durationMinutes !== null
+          data.durationMinutes !==
+            undefined &&
+          data.durationMinutes !==
+            null
         ) {
           setServerDurationMinutes(
-            Number(data.durationMinutes)
+            Number(
+              data.durationMinutes
+            )
           );
         }
 
-        setStartChecked(true);
+        setStartChecked(
+          true
+        );
       } catch (err) {
         console.error(
           "Start quiz error:",
@@ -568,7 +835,8 @@ function QuizPage() {
           });
         }
       } finally {
-        startRequestInProgress.current = false;
+        startRequestInProgress.current =
+          false;
       }
     };
 
@@ -584,12 +852,9 @@ function QuizPage() {
     navigate,
   ]);
 
-  // ------------------------------------------------------------
+  // ============================================================
   // FETCH QUESTIONS
-  //
-  // IMPORTANT:
-  // There is NO second /start-quiz call here.
-  // ------------------------------------------------------------
+  // ============================================================
 
   useEffect(() => {
     if (!quizActive) {
@@ -606,75 +871,104 @@ function QuizPage() {
 
     let cancelled = false;
 
-    const fetchQuestions = async () => {
-      setLoadingQuestions(true);
-      setQuizReady(false);
-      setQuestionsError(null);
+    const fetchQuestions =
+      async () => {
+        setLoadingQuestions(
+          true
+        );
 
-      try {
-        const res = await fetch(
-          `${API_BASE}/get-questions`,
-          {
-            cache: "no-store",
+        setQuizReady(false);
+
+        setQuestionsError(
+          null
+        );
+
+        try {
+          const res =
+            await fetch(
+              `${API_BASE}/get-questions`,
+              {
+                cache:
+                  "no-store",
+              }
+            );
+
+          const data =
+            await res.json();
+
+          if (
+            !res.ok ||
+            !data.success
+          ) {
+            throw new Error(
+              data?.message ||
+                "Could not load questions."
+            );
           }
-        );
 
-        const data = await res.json();
+          if (
+            !Array.isArray(
+              data.questions
+            )
+          ) {
+            throw new Error(
+              "Invalid questions response from server."
+            );
+          }
 
-        if (!res.ok || !data.success) {
-          throw new Error(
-            data?.message ||
-              "Could not load questions."
+          const withIndex =
+            data.questions.map(
+              (q, idx) => ({
+                ...q,
+                originalIndex:
+                  idx,
+              })
+            );
+
+          const shuffled =
+            shuffleArray(
+              withIndex
+            );
+
+          if (cancelled) {
+            return;
+          }
+
+          setQuestions(
+            shuffled
           );
-        }
 
-        if (!Array.isArray(data.questions)) {
-          throw new Error(
-            "Invalid questions response from server."
+          setAnswers(
+            new Array(
+              shuffled.length
+            ).fill(null)
           );
-        }
 
-        const withIndex = data.questions.map(
-          (q, idx) => ({
-            ...q,
-            originalIndex: idx,
-          })
-        );
+          setCurrent(0);
 
-        const shuffled =
-          shuffleArray(withIndex);
-
-        if (cancelled) {
-          return;
-        }
-
-        setQuestions(shuffled);
-
-        setAnswers(
-          new Array(shuffled.length).fill(null)
-        );
-
-        setCurrent(0);
-
-        setQuizReady(true);
-      } catch (err) {
-        console.error(
-          "Question loading error:",
-          err
-        );
-
-        if (!cancelled) {
-          setQuestionsError(
-            err.message ||
-              "Failed to load questions."
+          setQuizReady(
+            true
           );
+        } catch (err) {
+          console.error(
+            "Question loading error:",
+            err
+          );
+
+          if (!cancelled) {
+            setQuestionsError(
+              err.message ||
+                "Failed to load questions."
+            );
+          }
+        } finally {
+          if (!cancelled) {
+            setLoadingQuestions(
+              false
+            );
+          }
         }
-      } finally {
-        if (!cancelled) {
-          setLoadingQuestions(false);
-        }
-      }
-    };
+      };
 
     fetchQuestions();
 
@@ -687,9 +981,9 @@ function QuizPage() {
     student,
   ]);
 
-  // ------------------------------------------------------------
+  // ============================================================
   // NAVIGATION
-  // ------------------------------------------------------------
+  // ============================================================
 
   const goTo = useCallback(
     (idx) => {
@@ -703,244 +997,298 @@ function QuizPage() {
     [questions.length]
   );
 
-  // ------------------------------------------------------------
+  // ============================================================
   // SELECT ANSWER
-  // ------------------------------------------------------------
+  // ============================================================
 
-  const selectAnswer = useCallback(
-    (key) => {
+  const selectAnswer =
+    useCallback(
+      (key) => {
+        setAnswers((prev) => {
+          const updated = [
+            ...prev,
+          ];
+
+          updated[current] =
+            key;
+
+          return updated;
+        });
+      },
+      [current]
+    );
+
+  // ============================================================
+  // CLEAR ANSWER
+  // ============================================================
+
+  const clearAnswer =
+    useCallback(() => {
       setAnswers((prev) => {
-        const updated = [...prev];
+        const updated = [
+          ...prev,
+        ];
 
-        updated[current] = key;
+        updated[current] =
+          null;
 
         return updated;
       });
-    },
-    [current]
-  );
+    }, [current]);
 
-  // ------------------------------------------------------------
-  // CLEAR ANSWER
-  // ------------------------------------------------------------
-
-  const clearAnswer = useCallback(() => {
-    setAnswers((prev) => {
-      const updated = [...prev];
-
-      updated[current] = null;
-
-      return updated;
-    });
-  }, [current]);
-
-  // ------------------------------------------------------------
+  // ============================================================
   // SUBMIT QUIZ
-  // ------------------------------------------------------------
+  // ============================================================
 
-  const submitQuiz = useCallback(
-    async (auto = false) => {
-      if (submitted) {
-        return;
-      }
-
-      if (submitting) {
-        return;
-      }
-
-      if (!auto) {
-        const confirmed = window.confirm(
-          "Are you sure you want to submit the quiz?"
-        );
-
-        if (!confirmed) {
+  const submitQuiz =
+    useCallback(
+      async (auto = false) => {
+        if (submitted) {
           return;
         }
-      }
 
-      setSubmitted(true);
-      setSubmitting(true);
+        if (submitting) {
+          return;
+        }
 
-      // Stop timer
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
+        if (!auto) {
+          const confirmed =
+            window.confirm(
+              "Are you sure you want to submit the quiz?"
+            );
 
-        timerRef.current = null;
-      }
+          if (!confirmed) {
+            return;
+          }
+        }
 
-      // Stop status polling
-      if (statusIntervalRef.current) {
-        clearInterval(
+        setSubmitted(true);
+        setSubmitting(true);
+
+        // Stop timer
+        if (timerRef.current) {
+          clearInterval(
+            timerRef.current
+          );
+
+          timerRef.current =
+            null;
+        }
+
+        // Stop status polling
+        if (
           statusIntervalRef.current
-        );
-
-        statusIntervalRef.current = null;
-      }
-
-      try {
-        /*
-         * Convert shuffled answers back to the original
-         * question order.
-         */
-        const originalAnswers = new Array(
-          questions.length
-        ).fill(null);
-
-        questions.forEach(
-          (question, shuffledIndex) => {
-            originalAnswers[
-              question.originalIndex
-            ] =
-              answers[shuffledIndex] ?? null;
-          }
-        );
-
-        const res = await fetch(
-          `${API_BASE}/submit-quiz`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              regNo: student.regNo,
-              answers: originalAnswers,
-              auto,
-            }),
-          }
-        );
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          throw new Error(
-            data?.message ||
-              "Submission failed."
+        ) {
+          clearInterval(
+            statusIntervalRef.current
           );
+
+          statusIntervalRef.current =
+            null;
         }
 
-        /*
-         * Backend already marks auto submission as
-         * disqualified.
-         *
-         * Keep this extra frontend flag for compatibility
-         * with your existing result page.
-         */
-        if (auto && timeLeft <= 0) {
-          data.disqualified = true;
-        }
-
-        // Exit fullscreen
         try {
-          if (
-            document.fullscreenElement &&
-            document.exitFullscreen
-          ) {
-            await document.exitFullscreen();
-          }
-        } catch (fullscreenError) {
-          console.log(
-            "Could not exit fullscreen:",
-            fullscreenError
+          /*
+           * Convert shuffled answers back into original
+           * question order.
+           */
+          const originalAnswers =
+            new Array(
+              questions.length
+            ).fill(null);
+
+          questions.forEach(
+            (
+              question,
+              shuffledIndex
+            ) => {
+              originalAnswers[
+                question.originalIndex
+              ] =
+                answers[
+                  shuffledIndex
+                ] ?? null;
+            }
           );
+
+          const res =
+            await fetch(
+              `${API_BASE}/submit-quiz`,
+              {
+                method:
+                  "POST",
+                headers: {
+                  "Content-Type":
+                    "application/json",
+                },
+                body: JSON.stringify(
+                  {
+                    regNo:
+                      student.regNo,
+                    answers:
+                      originalAnswers,
+                    auto,
+                  }
+                ),
+              }
+            );
+
+          const data =
+            await res.json();
+
+          if (!res.ok) {
+            throw new Error(
+              data?.message ||
+                "Submission failed."
+            );
+          }
+
+          /*
+           * Backend already handles auto-submission.
+           *
+           * Keep frontend compatibility flag.
+           */
+          if (
+            auto &&
+            timeLeft <= 0
+          ) {
+            data.disqualified =
+              true;
+          }
+
+          // Exit fullscreen
+          try {
+            if (
+              document.fullscreenElement &&
+              document.exitFullscreen
+            ) {
+              await document.exitFullscreen();
+            }
+          } catch (
+            fullscreenError
+          ) {
+            console.log(
+              "Could not exit fullscreen:",
+              fullscreenError
+            );
+          }
+
+          navigate("/result", {
+            replace: true,
+            state: {
+              ...data,
+              student,
+              totalQuestions:
+                questions.length,
+            },
+          });
+        } catch (err) {
+          console.error(
+            "Submission error:",
+            err
+          );
+
+          alert(
+            "Submission failed: " +
+              (err.message ||
+                "Unknown error")
+          );
+
+          /*
+           * Allow retry if actual submission failed.
+           */
+          setSubmitted(false);
+          setSubmitting(false);
+
+          /*
+           * Status polling is recreated by the effect
+           * because submitted becomes false again.
+           */
         }
+      },
+      [
+        submitted,
+        submitting,
+        questions,
+        answers,
+        student,
+        navigate,
+        timeLeft,
+      ]
+    );
 
-        navigate("/result", {
-          replace: true,
-          state: {
-            ...data,
-            student,
-            totalQuestions:
-              questions.length,
-          },
-        });
-      } catch (err) {
-        console.error(
-          "Submission error:",
-          err
-        );
-
-        alert(
-          "Submission failed: " +
-            (err.message || "Unknown error")
-        );
-
-        /*
-         * Allow the student to retry if submission
-         * actually failed.
-         */
-        setSubmitted(false);
-        setSubmitting(false);
-
-        /*
-         * Restart status polling if necessary.
-         */
-        if (!statusIntervalRef.current) {
-          // Don't manually restart the polling here.
-          // The component can recover naturally.
-        }
-      }
-    },
-    [
-      submitted,
-      submitting,
-      questions,
-      answers,
-      student,
-      navigate,
-      timeLeft,
-    ]
-  );
-
-  // ------------------------------------------------------------
+  // ============================================================
   // KEEP LATEST SUBMIT FUNCTION IN REF
-  // ------------------------------------------------------------
+  // ============================================================
 
   useEffect(() => {
     submitQuizRef.current =
       submitQuiz;
   }, [submitQuiz]);
 
-  // ------------------------------------------------------------
+  // ============================================================
   // HANDLE TIMER EXPIRATION
-  // ------------------------------------------------------------
+  // ============================================================
 
   const handleTimeExpired =
     useCallback(() => {
-      if (autoSubmitted.current) {
+      if (
+        autoSubmitted.current
+      ) {
         return;
       }
 
-      autoSubmitted.current = true;
+      autoSubmitted.current =
+        true;
 
       if (timerRef.current) {
         clearInterval(
           timerRef.current
         );
 
-        timerRef.current = null;
+        timerRef.current =
+          null;
       }
 
-      if (statusIntervalRef.current) {
+      if (
+        statusIntervalRef.current
+      ) {
         clearInterval(
           statusIntervalRef.current
         );
 
-        statusIntervalRef.current = null;
+        statusIntervalRef.current =
+          null;
       }
 
-      if (submitQuizRef.current) {
-        submitQuizRef.current(true);
+      if (
+        submitQuizRef.current
+      ) {
+        submitQuizRef.current(
+          true
+        );
       }
     }, []);
 
-  // ------------------------------------------------------------
-  // TIMER
+  // ============================================================
+  // SERVER-SYNCHRONIZED TIMER
+  // ============================================================
   //
-  // Timer is based on serverEndTime.
+  // IMPORTANT:
   //
-  // It does NOT simply start "30 minutes from page load".
-  // ------------------------------------------------------------
+  // The timer NEVER does:
+  //
+  //   Date.now()
+  //
+  // directly.
+  //
+  // It uses:
+  //
+  //   getServerSyncedNow()
+  //
+  // so a student's incorrect local clock does not alter the
+  // exam countdown.
+  // ============================================================
 
   useEffect(() => {
     if (!quizActive) {
@@ -972,33 +1320,53 @@ function QuizPage() {
       return;
     }
 
-    /*
-     * Immediately calculate from server end time.
-     */
     const updateTimer = () => {
-      const now = Date.now();
+      /*
+       * SERVER-SYNCHRONIZED CURRENT TIME
+       */
+      const now =
+        getServerSyncedNow();
 
-      const remaining = Math.max(
-        0,
-        Math.ceil(
-          (serverEndTime.getTime() - now) /
-            1000
-        )
+      /*
+       * Backend endTime is authoritative.
+       */
+      const remaining =
+        Math.max(
+          0,
+          Math.ceil(
+            (serverEndTime.getTime() -
+              now) /
+              1000
+          )
+        );
+
+      setTimeLeft(
+        remaining
       );
 
-      setTimeLeft(remaining);
-
-      if (remaining <= 0) {
+      if (
+        remaining <= 0
+      ) {
         handleTimeExpired();
       }
     };
 
+    /*
+     * Calculate immediately.
+     */
     updateTimer();
 
-    timerRef.current = setInterval(
-      updateTimer,
-      1000
-    );
+    /*
+     * Local one-second display update.
+     *
+     * The server clock offset is periodically refreshed
+     * by /quiz-status.
+     */
+    timerRef.current =
+      setInterval(
+        updateTimer,
+        1000
+      );
 
     return () => {
       if (timerRef.current) {
@@ -1006,7 +1374,8 @@ function QuizPage() {
           timerRef.current
         );
 
-        timerRef.current = null;
+        timerRef.current =
+          null;
       }
     };
   }, [
@@ -1017,11 +1386,12 @@ function QuizPage() {
     questions.length,
     serverEndTime,
     handleTimeExpired,
+    getServerSyncedNow,
   ]);
 
-  // ------------------------------------------------------------
-  // CLEANUP WHEN COMPONENT UNMOUNTS
-  // ------------------------------------------------------------
+  // ============================================================
+  // CLEANUP
+  // ============================================================
 
   useEffect(() => {
     return () => {
@@ -1031,7 +1401,9 @@ function QuizPage() {
         );
       }
 
-      if (statusIntervalRef.current) {
+      if (
+        statusIntervalRef.current
+      ) {
         clearInterval(
           statusIntervalRef.current
         );
@@ -1039,45 +1411,72 @@ function QuizPage() {
     };
   }, []);
 
-  // ------------------------------------------------------------
+  // ============================================================
   // MOBILE
-  // ------------------------------------------------------------
+  // ============================================================
 
   const isMobile =
     window.innerWidth < 768 ||
     "ontouchstart" in window;
 
-  // ------------------------------------------------------------
+  // ============================================================
   // LANDSCAPE OVERLAY
-  // ------------------------------------------------------------
+  // ============================================================
 
   if (
     isMobile &&
     !isLandscape
   ) {
     return (
-      <div style={styles.landscapeOverlay}>
-        <div style={styles.landscapeContent}>
-          <div style={styles.rotateIcon}>
+      <div
+        style={
+          styles.landscapeOverlay
+        }
+      >
+        <div
+          style={
+            styles.landscapeContent
+          }
+        >
+          <div
+            style={
+              styles.rotateIcon
+            }
+          >
             📱
           </div>
 
-          <h2 style={{ color: "#000" }}>
-            Please rotate your device
+          <h2
+            style={{
+              color: "#000",
+            }}
+          >
+            Please rotate your
+            device
           </h2>
 
-          <p style={{ color: "#000" }}>
-            This quiz must be taken in{" "}
-            <strong>landscape</strong> mode.
+          <p
+            style={{
+              color: "#000",
+            }}
+          >
+            This quiz must be
+            taken in{" "}
+            <strong>
+              landscape
+            </strong>{" "}
+            mode.
           </p>
 
           <p
             style={{
               color: "#000",
-              fontSize: "0.9rem",
+              fontSize:
+                "0.9rem",
             }}
           >
-            Turn your phone sideways to
+            Turn your phone
+            sideways to
             continue.
           </p>
         </div>
@@ -1085,9 +1484,9 @@ function QuizPage() {
     );
   }
 
-  // ------------------------------------------------------------
+  // ============================================================
   // WAITING SCREEN
-  // ------------------------------------------------------------
+  // ============================================================
 
   if (!quizActive) {
     const totalSecs =
@@ -1096,13 +1495,16 @@ function QuizPage() {
         waitTime || 0
       );
 
-    const hours = Math.floor(
-      totalSecs / 3600
-    );
+    const hours =
+      Math.floor(
+        totalSecs / 3600
+      );
 
-    const mins = Math.floor(
-      (totalSecs % 3600) / 60
-    );
+    const mins =
+      Math.floor(
+        (totalSecs % 3600) /
+          60
+      );
 
     const secs =
       totalSecs % 60;
@@ -1115,15 +1517,23 @@ function QuizPage() {
               timeZone:
                 "Asia/Kolkata",
               hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
+              minute:
+                "2-digit",
+              second:
+                "2-digit",
             }
           )
         : "soon";
 
     return (
-      <div style={styles.waitContainer}>
-        <div style={styles.overlay}>
+      <div
+        style={
+          styles.waitContainer
+        }
+      >
+        <div
+          style={styles.overlay}
+        >
           <div
             style={
               styles.warningCard
@@ -1134,7 +1544,8 @@ function QuizPage() {
                 color: "#000",
               }}
             >
-              🔒 Quiz will begin in
+              🔒 Quiz will begin
+              in
             </h2>
 
             <p
@@ -1152,7 +1563,8 @@ function QuizPage() {
             <div
               style={{
                 ...styles.countdown,
-                color: "#0066b3",
+                color:
+                  "#0066b3",
               }}
             >
               {hours
@@ -1174,9 +1586,9 @@ function QuizPage() {
               }}
             >
               The quiz will start
-              automatically when the
-              scheduled exam time is
-              reached.
+              automatically when
+              the scheduled exam
+              time is reached.
             </p>
 
             <p
@@ -1186,8 +1598,8 @@ function QuizPage() {
                   "0.85rem",
               }}
             >
-              Please keep this page
-              open.
+              Please keep this
+              page open.
             </p>
           </div>
         </div>
@@ -1331,9 +1743,9 @@ function QuizPage() {
     );
   }
 
-  // ------------------------------------------------------------
+  // ============================================================
   // FULLSCREEN BLOCKER
-  // ------------------------------------------------------------
+  // ============================================================
 
   if (
     quizActive &&
@@ -1354,22 +1766,27 @@ function QuizPage() {
         >
           <h2
             style={{
-              color: "#dc2626",
+              color:
+                "#dc2626",
             }}
           >
-            ⚠️ Fullscreen Required
+            ⚠️ Fullscreen
+            Required
           </h2>
 
           <p
             style={{
               color: "#000",
-              margin: "1rem 0",
+              margin:
+                "1rem 0",
             }}
           >
-            You must be in fullscreen
-            mode to take this exam.
-            Leaving fullscreen may
-            result in disqualification.
+            You must be in
+            fullscreen mode to
+            take this exam.
+            Leaving fullscreen
+            may result in
+            disqualification.
           </p>
 
           <button
@@ -1387,9 +1804,9 @@ function QuizPage() {
     );
   }
 
-  // ------------------------------------------------------------
+  // ============================================================
   // LOADING QUESTIONS
-  // ------------------------------------------------------------
+  // ============================================================
 
   if (
     loadingQuestions ||
@@ -1424,7 +1841,8 @@ function QuizPage() {
             color: "#000",
           }}
         >
-          Loading Questions...
+          Loading
+          Questions...
         </h2>
 
         <p
@@ -1438,9 +1856,9 @@ function QuizPage() {
     );
   }
 
-  // ------------------------------------------------------------
+  // ============================================================
   // QUESTION ERROR
-  // ------------------------------------------------------------
+  // ============================================================
 
   if (questionsError) {
     return (
@@ -1451,10 +1869,12 @@ function QuizPage() {
       >
         <h2
           style={{
-            color: "#dc2626",
+            color:
+              "#dc2626",
           }}
         >
-          ⚠️ Error loading questions
+          ⚠️ Error loading
+          questions
         </h2>
 
         <p
@@ -1470,15 +1890,18 @@ function QuizPage() {
             window.location.reload()
           }
           style={{
-            marginTop: "1rem",
+            marginTop:
+              "1rem",
             padding:
               "0.5rem 1.5rem",
             backgroundColor:
               "#0066b3",
             color: "#fff",
             border: "none",
-            borderRadius: "8px",
-            cursor: "pointer",
+            borderRadius:
+              "8px",
+            cursor:
+              "pointer",
           }}
         >
           Retry
@@ -1487,9 +1910,9 @@ function QuizPage() {
     );
   }
 
-  // ------------------------------------------------------------
+  // ============================================================
   // SUBMITTING
-  // ------------------------------------------------------------
+  // ============================================================
 
   if (submitting) {
     return (
@@ -1521,7 +1944,8 @@ function QuizPage() {
             color: "#000",
           }}
         >
-          Calculating your result...
+          Calculating your
+          result...
         </h2>
 
         <p
@@ -1535,9 +1959,9 @@ function QuizPage() {
     );
   }
 
-  // ------------------------------------------------------------
+  // ============================================================
   // NO QUESTIONS
-  // ------------------------------------------------------------
+  // ============================================================
 
   if (!questions.length) {
     return (
@@ -1551,7 +1975,8 @@ function QuizPage() {
             color: "#000",
           }}
         >
-          No questions available
+          No questions
+          available
         </h2>
 
         <button
@@ -1559,15 +1984,18 @@ function QuizPage() {
             window.location.reload()
           }
           style={{
-            marginTop: "1rem",
+            marginTop:
+              "1rem",
             padding:
               "0.5rem 1.5rem",
             backgroundColor:
               "#0066b3",
             color: "#fff",
             border: "none",
-            borderRadius: "8px",
-            cursor: "pointer",
+            borderRadius:
+              "8px",
+            cursor:
+              "pointer",
           }}
         >
           Retry
@@ -1576,9 +2004,9 @@ function QuizPage() {
     );
   }
 
-  // ------------------------------------------------------------
+  // ============================================================
   // CURRENT QUESTION
-  // ------------------------------------------------------------
+  // ============================================================
 
   const q =
     questions[current];
@@ -1617,9 +2045,9 @@ function QuizPage() {
     );
   }
 
-  // ------------------------------------------------------------
+  // ============================================================
   // DISPLAY DATA
-  // ------------------------------------------------------------
+  // ============================================================
 
   const attemptedCount =
     answers.filter(
@@ -1657,15 +2085,17 @@ function QuizPage() {
   const timerSeconds =
     timeLeft % 60;
 
-  // ------------------------------------------------------------
+  // ============================================================
   // QUIZ UI
-  // ------------------------------------------------------------
+  // ============================================================
 
   return (
     <div style={styles.page}>
       {/* TOP BAR */}
 
-      <div style={styles.topBar}>
+      <div
+        style={styles.topBar}
+      >
         <div
           style={
             styles.profileSection
@@ -1793,7 +2223,9 @@ function QuizPage() {
 
       {/* BODY */}
 
-      <div style={styles.bodyRow}>
+      <div
+        style={styles.bodyRow}
+      >
         {/* MAIN CONTENT */}
 
         <div
@@ -1848,20 +2280,19 @@ function QuizPage() {
             ).map(
               ([key, val]) => {
                 const isSelected =
-                  answers[current] ===
-                  key;
+                  answers[
+                    current
+                  ] === key;
 
                 return (
                   <label
                     key={key}
                     style={{
                       ...styles.optionLabel,
-
                       backgroundColor:
                         isSelected
                           ? "#e6f0fa"
                           : "#ffffff",
-
                       borderColor:
                         isSelected
                           ? "#0066b3"
@@ -1941,8 +2372,8 @@ function QuizPage() {
               type="button"
               style={{
                 ...styles.navBtn,
-
-                ...(current === 0
+                ...(current ===
+                0
                   ? styles.navBtnDisabled
                   : {}),
               }}
@@ -1964,7 +2395,6 @@ function QuizPage() {
               type="button"
               style={{
                 ...styles.clearBtn,
-
                 ...(answers[
                   current
                 ] === null
@@ -1989,9 +2419,9 @@ function QuizPage() {
               type="button"
               style={{
                 ...styles.navBtn,
-
                 ...(current ===
-                questions.length - 1
+                questions.length -
+                  1
                   ? styles.navBtnDisabled
                   : {}),
               }}
@@ -2002,7 +2432,8 @@ function QuizPage() {
               }
               disabled={
                 current ===
-                questions.length - 1
+                questions.length -
+                  1
               }
             >
               Next →
@@ -2048,11 +2479,15 @@ function QuizPage() {
                 if (
                   isAttempted
                 ) {
-                  bg = "#22c55e";
-                  color = "#fff";
+                  bg =
+                    "#22c55e";
+                  color =
+                    "#fff";
                 } else {
-                  bg = "#f3f4f6";
-                  color = "#000";
+                  bg =
+                    "#f3f4f6";
+                  color =
+                    "#000";
                 }
 
                 return (
@@ -2063,17 +2498,13 @@ function QuizPage() {
                     }
                     style={{
                       ...styles.paletteItem,
-
                       backgroundColor:
                         bg,
-
                       color,
-
                       border:
                         isCurrent
                           ? "3px solid #0066b3"
                           : "2px solid transparent",
-
                       cursor:
                         "pointer",
                     }}
@@ -2314,7 +2745,8 @@ const styles = {
     flexDirection:
       "column",
     lineHeight: 1.3,
-    fontSize: "0.95rem",
+    fontSize:
+      "0.95rem",
     color: "#000",
   },
 
@@ -2338,7 +2770,8 @@ const styles = {
   },
 
   timerText: {
-    fontSize: "1.2rem",
+    fontSize:
+      "1.2rem",
     fontWeight: 700,
     fontVariantNumeric:
       "tabular-nums",
@@ -2355,14 +2788,17 @@ const styles = {
     color: "#fff",
     border: "none",
     borderRadius: "8px",
-    cursor: "pointer",
+    cursor:
+      "pointer",
     boxShadow:
       "0 2px 8px rgba(0, 102, 179, 0.25)",
-    width: "fit-content",
+    width:
+      "fit-content",
   },
 
   submitBtn: {
-    display: "inline-flex",
+    display:
+      "inline-flex",
     alignItems:
       "center",
     justifyContent:
@@ -2384,7 +2820,8 @@ const styles = {
       "0 2px 8px rgba(0, 102, 179, 0.25)",
     flex:
       "0 0 auto",
-    width: "auto",
+    width:
+      "auto",
     whiteSpace:
       "nowrap",
   },
@@ -2575,7 +3012,8 @@ const styles = {
       "all 0.2s",
     flex:
       "0 0 auto",
-    width: "auto",
+    width:
+      "auto",
     whiteSpace:
       "nowrap",
   },
@@ -2618,7 +3056,8 @@ const styles = {
       "all 0.2s",
     flex:
       "0 0 auto",
-    width: "auto",
+    width:
+      "auto",
     whiteSpace:
       "nowrap",
   },
@@ -2639,7 +3078,8 @@ const styles = {
       "0 2px 8px rgba(0,0,0,0.06)",
     padding:
       "1.2rem 1rem",
-    overflowY: "auto",
+    overflowY:
+      "auto",
     display: "flex",
     flexDirection:
       "column",
@@ -2829,7 +3269,8 @@ const styles = {
 // ============================================================
 
 if (
-  typeof document !== "undefined" &&
+  typeof document !==
+    "undefined" &&
   !document.getElementById(
     "quiz-page-global-styles"
   )
