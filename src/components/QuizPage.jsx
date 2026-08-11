@@ -1,4 +1,4 @@
- import React, {
+import React, {
   useEffect,
   useState,
   useRef,
@@ -128,6 +128,15 @@ function QuizPage() {
     useRef(false);
 
   /*
+   * Prevent a manual submit and timer auto-submit from
+   * entering submitQuiz at the same time. React state updates
+   * are asynchronous, so submitted/submitting alone are not
+   * sufficient as a synchronous lock.
+   */
+  const submitRequestInProgress =
+    useRef(false);
+
+  /*
    * ----------------------------------------------------------
    * SERVER CLOCK SYNCHRONIZATION
    * ----------------------------------------------------------
@@ -147,6 +156,9 @@ function QuizPage() {
   const serverClockOffsetRef = useRef(0);
 
   const lastServerSyncRef = useRef(0);
+
+  /* Prevent overlapping /quiz-status + /servertime polls. */
+  const statusRequestInProgress = useRef(false);
 
   // ------------------------------------------------------------
   // SERVER-SYNCHRONIZED NOW
@@ -363,6 +375,16 @@ function QuizPage() {
     let cancelled = false;
 
     const checkStatus = async () => {
+      if (
+        statusRequestInProgress.current ||
+        cancelled ||
+        submitRequestInProgress.current
+      ) {
+        return;
+      }
+
+      statusRequestInProgress.current = true;
+
       try {
         /*
          * Record request start time.
@@ -372,26 +394,52 @@ function QuizPage() {
         const requestStartedAt =
           Date.now();
 
-        const res = await fetch(
-          `${API_BASE}/quiz-status`,
-          {
-            cache: "no-store",
-          }
-        );
+        /*
+         * /quiz-status controls exam state.
+         * /servertime gives an explicit server clock because the
+         * browser cannot reliably read the HTTP Date header across
+         * origins unless the backend exposes that header.
+         */
+        const [statusRes, serverTimeRes] =
+          await Promise.all([
+            fetch(
+              `${API_BASE}/quiz-status`,
+              {
+                cache: "no-store",
+              }
+            ),
+            fetch(
+              `${API_BASE}/servertime`,
+              {
+                cache: "no-store",
+              }
+            ),
+          ]);
 
         const requestFinishedAt =
           Date.now();
 
-        if (!res.ok) {
+        if (!statusRes.ok) {
           throw new Error(
-            `Quiz status request failed (${res.status})`
+            `Quiz status request failed (${statusRes.status})`
           );
         }
 
         const data =
-          await res.json();
+          await statusRes.json();
 
-        if (cancelled) {
+        let serverTimeData = null;
+
+        if (serverTimeRes.ok) {
+          try {
+            serverTimeData =
+              await serverTimeRes.json();
+          } catch {
+            serverTimeData = null;
+          }
+        }
+
+        if (cancelled || submitRequestInProgress.current) {
           return;
         }
 
@@ -416,6 +464,8 @@ function QuizPage() {
         let serverNow = null;
 
         const possibleServerTime =
+          serverTimeData?.serverTimeUTC ??
+          serverTimeData?.serverTime ??
           data?.serverTime ??
           data?.currentTime ??
           data?.now;
@@ -441,7 +491,7 @@ function QuizPage() {
          */
         if (serverNow === null) {
           const dateHeader =
-            res.headers.get(
+            statusRes.headers.get(
               "date"
             );
 
@@ -468,7 +518,11 @@ function QuizPage() {
          * Middle of request is used as approximate moment
          * at which server response was generated.
          */
-        if (serverNow !== null) {
+        if (
+          serverNow !== null &&
+          requestFinishedAt >=
+            lastServerSyncRef.current
+        ) {
           const estimatedClientNow =
             requestStartedAt +
             (requestFinishedAt -
@@ -587,7 +641,8 @@ function QuizPage() {
         if (data.hasEnded) {
           if (
             !autoSubmitted.current &&
-            !submitting
+            !submitting &&
+            !submitRequestInProgress.current
           ) {
             alert(
               "The quiz has ended. You cannot take it now."
@@ -639,6 +694,9 @@ function QuizPage() {
          *
          * The next request can recover.
          */
+      } finally {
+        statusRequestInProgress.current =
+          false;
       }
     };
 
@@ -814,6 +872,9 @@ function QuizPage() {
             )
           );
         }
+
+        autoSubmitted.current = false;
+        submitRequestInProgress.current = false;
 
         setStartChecked(
           true
@@ -1043,11 +1104,17 @@ function QuizPage() {
   const submitQuiz =
     useCallback(
       async (auto = false) => {
-        if (submitted) {
+        /*
+         * IMPORTANT: use a ref as the first synchronous guard.
+         * This prevents the timer and the Submit button from
+         * sending two /submit-quiz requests during the same
+         * render cycle.
+         */
+        if (submitRequestInProgress.current) {
           return;
         }
 
-        if (submitting) {
+        if (submitted || submitting) {
           return;
         }
 
@@ -1061,6 +1128,9 @@ function QuizPage() {
             return;
           }
         }
+
+        /* Lock BEFORE any async work starts. */
+        submitRequestInProgress.current = true;
 
         setSubmitted(true);
         setSubmitting(true);
@@ -1121,6 +1191,7 @@ function QuizPage() {
                   "Content-Type":
                     "application/json",
                 },
+                cache: "no-store",
                 body: JSON.stringify(
                   {
                     regNo:
@@ -1133,33 +1204,50 @@ function QuizPage() {
               }
             );
 
-          const data =
-            await res.json();
+          let data = null;
+
+          try {
+            data = await res.json();
+          } catch {
+            data = null;
+          }
 
           if (!res.ok) {
-            throw new Error(
+            /*
+             * A 404 after an otherwise valid active attempt can
+             * happen if the server has already accepted a previous
+             * request. Do not silently treat it as success, but
+             * expose the real backend message instead of the vague
+             * generic error.
+             */
+            const message =
               data?.message ||
-                "Submission failed."
-            );
+              `Submission failed (HTTP ${res.status}).`;
+
+            throw new Error(message);
           }
 
           /*
-           * Backend already handles auto-submission.
-           *
-           * Keep frontend compatibility flag.
+           * Backend is authoritative for disqualification.
+           * Keep this compatibility fallback only when the timer
+           * itself reached zero.
            */
           if (
             auto &&
-            timeLeft <= 0
+            timeLeft <= 0 &&
+            data &&
+            data.disqualified === undefined
           ) {
-            data.disqualified =
-              true;
+            data.disqualified = true;
           }
 
           // Exit fullscreen
           try {
             if (
-              document.fullscreenElement &&
+              (
+                document.fullscreenElement ||
+                document.webkitFullscreenElement
+              ) &&
               document.exitFullscreen
             ) {
               await document.exitFullscreen();
@@ -1173,37 +1261,42 @@ function QuizPage() {
             );
           }
 
-          navigate("/result", {
-            replace: true,
-            state: {
-              ...data,
-              student,
-              totalQuestions:
-                questions.length,
-            },
-          });
+          navigate(
+            "/result",
+            {
+              replace: true,
+              state: {
+                ...(data || {}),
+                student,
+                totalQuestions:
+                  questions.length,
+              },
+            }
+          );
         } catch (err) {
           console.error(
             "Submission error:",
             err
           );
 
+          /*
+           * The request did not complete successfully from the
+           * frontend's point of view, so allow one later retry.
+           * The backend remains authoritative about whether an
+           * attempt was actually submitted.
+           */
           alert(
             "Submission failed: " +
               (err.message ||
                 "Unknown error")
           );
 
-          /*
-           * Allow retry if actual submission failed.
-           */
           setSubmitted(false);
           setSubmitting(false);
-
-          /*
-           * Status polling is recreated by the effect
-           * because submitted becomes false again.
-           */
+        } finally {
+          /* Always release the synchronous React race lock. */
+          submitRequestInProgress.current =
+            false;
         }
       },
       [
@@ -1233,7 +1326,8 @@ function QuizPage() {
   const handleTimeExpired =
     useCallback(() => {
       if (
-        autoSubmitted.current
+        autoSubmitted.current ||
+        submitRequestInProgress.current
       ) {
         return;
       }
