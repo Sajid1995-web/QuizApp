@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./App.css";
 
-const API_BASE = "https://quizappbackend-k09m.onrender.com";
+const API_BASE = "http://localhost:3000";
 
 function Login() {
   const navigate = useNavigate();

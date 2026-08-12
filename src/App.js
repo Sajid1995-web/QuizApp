@@ -6,6 +6,7 @@ import Login from "./components/StudentLogin.jsx";
 import QuizPage from "./components/QuizPage";
 import ResultPage from "./components/CertificatePage";
 import RulesPage from "./components/RulesPage";
+import Disqualified from "./components/Disqualified.jsx";
 import "./App.css";
 
 function App() {
@@ -18,6 +19,10 @@ function App() {
         <Route path="/quiz" element={<QuizPage />} />
         <Route path="/result" element={<ResultPage />} />
         <Route path="/rules" element={<RulesPage />} />
+        <Route
+  path="/disqualified"
+  element={<Disqualified />}
+/>
       </Routes>
     </BrowserRouter>
   );

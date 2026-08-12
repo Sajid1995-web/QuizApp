@@ -109,7 +109,7 @@ function RulesPage() {
             </p>
 
             <div style={styles.dateBadge}>
-              <strong>Quiz Date:</strong> 12.08.2026 &nbsp;|&nbsp; <strong>Time:</strong> 14:45 Hrs
+              <strong>Quiz Date:</strong> 09.08.2026 &nbsp;|&nbsp; <strong>Time:</strong> 21:00 Hrs
             </div>
 
             <p style={styles.descText}>
@@ -150,9 +150,9 @@ function RulesPage() {
             <div style={styles.ruleCard}>
               <div style={{ ...styles.ruleNumber, background: "linear-gradient(135deg, #00b894, #00cec9)" }}>03</div>
               <div style={styles.ruleContent}>
-                <strong>Submission Guidelines:</strong> The quiz will be available only on <strong>12th August, 2026
-                at 14:45 Hrs</strong>. Portal will not allow to participate and enter into the webpage except
-                scheduled time. Duration of the quiz is <strong>05 Minutes</strong> and Questions will be displayed
+                <strong>Submission Guidelines:</strong> The quiz will be available only on <strong>9th August, 2026
+                at 21:00 Hrs</strong>. Portal will not allow to participate and enter into the webpage except
+                scheduled time. Duration of the quiz is <strong>10 Minutes</strong> and Questions will be displayed
                 one by one. During the active session participants can change the response. At the end they must
                 submit the responses to register the answer. If not submitted within schedule time, it can be
                 treated as disqualified. Once submitted, responses cannot be edited or resubmitted.
@@ -161,7 +161,7 @@ function RulesPage() {
             <div style={styles.ruleCard}>
               <div style={{ ...styles.ruleNumber, background: "linear-gradient(135deg, #fdcb6e, #e17055)" }}>04</div>
               <div style={styles.ruleContent}>
-                <strong>Evaluation:</strong> Each correct answer carries <strong>Two mark</strong>. There is negative
+                <strong>Evaluation:</strong> Each correct answer carries <strong>One mark</strong>. There is negative
                 marking. <strong>One mark will be deducted</strong> for 1 wrong answer. In the event of a tie,
                 participants who submitted their entries fastest will be considered as winner. If required, the
                 organizing committee may apply additional tie‑breaking criteria. Winners will be selected based on
