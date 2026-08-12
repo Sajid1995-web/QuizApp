@@ -65,26 +65,15 @@ function QuizPage() {
   const autoSubmitted = useRef(false);
   const statusIntervalRef = useRef(null);
   const startRequestInProgress = useRef(false);
-  // Server time synchronization is based ONLY on performance.now().
-  // performance.now() is monotonic and is independent of the laptop/phone
-  // system clock, so changing the device clock cannot change the countdown.
-  const serverTimeBaseRef = useRef(null);
-  const performanceBaseRef = useRef(null);
+  const serverClockOffsetRef = useRef(0);
   const lastServerSyncRef = useRef(0);
 
   // ------------------------------------------------------------
-  // SERVER-SYNCHRONIZED NOW (DEVICE CLOCK IGNORED)
+  // SERVER-SYNCHRONIZED NOW
   // ------------------------------------------------------------
 
   const getServerSyncedNow = useCallback(() => {
-    if (serverTimeBaseRef.current === null || performanceBaseRef.current === null) {
-      return null;
-    }
-
-    return (
-      serverTimeBaseRef.current +
-      (performance.now() - performanceBaseRef.current)
-    );
+    return Date.now() + serverClockOffsetRef.current;
   }, []);
 
   // ------------------------------------------------------------
@@ -189,11 +178,9 @@ function QuizPage() {
 
     const checkStatus = async () => {
       try {
-        // IMPORTANT: use performance.now(), NOT Date.now().
-        // This makes synchronization independent of the device clock.
-        const requestStartedAt = performance.now();
+        const requestStartedAt = Date.now();
         const res = await fetch(`${API_BASE}/quiz-status`, { cache: "no-store" });
-        const requestFinishedAt = performance.now();
+        const requestFinishedAt = Date.now();
 
         if (!res.ok) throw new Error(`Quiz status request failed (${res.status})`);
         const data = await res.json();
@@ -214,14 +201,8 @@ function QuizPage() {
           }
         }
         if (serverNow !== null) {
-          // Estimate when the server timestamp was observed at the midpoint
-          // of the request. This is a monotonic reference and does NOT use
-          // the laptop/phone wall clock.
-          const estimatedPerformanceAtServerTime =
-            requestStartedAt + (requestFinishedAt - requestStartedAt) / 2;
-
-          serverTimeBaseRef.current = serverNow;
-          performanceBaseRef.current = estimatedPerformanceAtServerTime;
+          const estimatedClientNow = requestStartedAt + (requestFinishedAt - requestStartedAt) / 2;
+          serverClockOffsetRef.current = serverNow - estimatedClientNow;
           lastServerSyncRef.current = requestFinishedAt;
         }
 
@@ -239,10 +220,8 @@ function QuizPage() {
           setQuizActive(true);
           if (end && !Number.isNaN(end.getTime())) {
             const now = getServerSyncedNow();
-            if (now !== null) {
-              const remaining = Math.max(0, Math.ceil((end.getTime() - now) / 1000));
-              setTimeLeft(remaining);
-            }
+            const remaining = Math.max(0, Math.ceil((end.getTime() - now) / 1000));
+            setTimeLeft(remaining);
           }
           return;
         }
@@ -260,10 +239,8 @@ function QuizPage() {
         setQuizActive(false);
         if (start && !Number.isNaN(start.getTime())) {
           const now = getServerSyncedNow();
-          if (now !== null) {
-            const diff = Math.max(0, Math.ceil((start.getTime() - now) / 1000));
-            setWaitTime(diff);
-          }
+          const diff = Math.max(0, Math.ceil((start.getTime() - now) / 1000));
+          setWaitTime(diff);
         }
       } catch (err) {
         console.error("Quiz status check error:", err);
@@ -513,8 +490,6 @@ function QuizPage() {
 
     const updateTimer = () => {
       const now = getServerSyncedNow();
-      if (now === null) return;
-
       const remaining = Math.max(0, Math.ceil((serverEndTime.getTime() - now) / 1000));
       setTimeLeft(remaining);
       if (remaining <= 0) {
