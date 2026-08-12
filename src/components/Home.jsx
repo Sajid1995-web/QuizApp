@@ -109,7 +109,7 @@ function RulesPage() {
             </p>
 
             <div style={styles.dateBadge}>
-              <strong>Quiz Date:</strong> 09.08.2026 &nbsp;|&nbsp; <strong>Time:</strong> 21:00 Hrs
+              <strong>Quiz Date:</strong> 12.08.2026 &nbsp;|&nbsp; <strong>Time:</strong> 14:45 Hrs
             </div>
 
             <p style={styles.descText}>
