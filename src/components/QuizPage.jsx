@@ -1,4 +1,4 @@
-  import React, {
+   import React, {
   useEffect,
   useState,
   useRef,
@@ -65,48 +65,15 @@ function QuizPage() {
   const autoSubmitted = useRef(false);
   const statusIntervalRef = useRef(null);
   const startRequestInProgress = useRef(false);
-  // Server-time countdown reference. No device clock and no offset.
-  const serverCountdownRef = useRef({
-    remainingSeconds: null,
-    performanceBase: null,
-  });
+  const serverClockOffsetRef = useRef(0);
+  const lastServerSyncRef = useRef(0);
 
   // ------------------------------------------------------------
-  // SERVER-TIME COUNTDOWN (NO CLOCK OFFSET)
+  // SERVER-SYNCHRONIZED NOW
   // ------------------------------------------------------------
 
-  const syncCountdownFromServer = useCallback((serverNowMs, endMs) => {
-    if (!Number.isFinite(serverNowMs) || !Number.isFinite(endMs)) {
-      return null;
-    }
-
-    // Calculate the initial remaining time using ONLY timestamps supplied
-    // by the backend. The device's current clock is not involved.
-    const remainingSeconds = Math.max(
-      0,
-      Math.ceil((endMs - serverNowMs) / 1000)
-    );
-
-    serverCountdownRef.current = {
-      remainingSeconds,
-      performanceBase: performance.now(),
-    };
-
-    return remainingSeconds;
-  }, []);
-
-  const getServerRemainingSeconds = useCallback(() => {
-    const sync = serverCountdownRef.current;
-
-    if (sync.remainingSeconds === null || sync.performanceBase === null) {
-      return null;
-    }
-
-    const elapsedSeconds = Math.floor(
-      (performance.now() - sync.performanceBase) / 1000
-    );
-
-    return Math.max(0, sync.remainingSeconds - elapsedSeconds);
+  const getServerSyncedNow = useCallback(() => {
+    return Date.now() + serverClockOffsetRef.current;
   }, []);
 
   // ------------------------------------------------------------
@@ -201,7 +168,7 @@ function QuizPage() {
   }, []);
 
   // ============================================================
-  // CHECK EXAM STATUS USING SERVER TIME ONLY
+  // CHECK EXAM STATUS + SERVER CLOCK SYNC
   // ============================================================
 
   useEffect(() => {
@@ -211,52 +178,56 @@ function QuizPage() {
 
     const checkStatus = async () => {
       try {
+        const requestStartedAt = Date.now();
         const res = await fetch(`${API_BASE}/quiz-status`, { cache: "no-store" });
+        const requestFinishedAt = Date.now();
 
-        if (!res.ok) {
-          throw new Error(`Quiz status request failed (${res.status})`);
-        }
-
+        if (!res.ok) throw new Error(`Quiz status request failed (${res.status})`);
         const data = await res.json();
         if (cancelled) return;
 
-        // Backend is authoritative. We intentionally use serverNow only.
-        const serverNow = data?.serverNow
-          ? new Date(data.serverNow).getTime()
-          : NaN;
-
-        const start = data?.startTime ? new Date(data.startTime) : null;
-        const end = data?.endTime ? new Date(data.endTime) : null;
-
-        if (start && !Number.isNaN(start.getTime())) {
-          setServerStartTime(start);
+        // ---- Server clock sync ----
+        let serverNow = null;
+        const possibleServerTime = data?.serverTime ?? data?.currentTime ?? data?.now;
+        if (possibleServerTime) {
+          const parsed = new Date(possibleServerTime).getTime();
+          if (!Number.isNaN(parsed)) serverNow = parsed;
         }
-        if (end && !Number.isNaN(end.getTime())) {
-          setServerEndTime(end);
+        if (serverNow === null) {
+          const dateHeader = res.headers.get("date");
+          if (dateHeader) {
+            const parsed = new Date(dateHeader).getTime();
+            if (!Number.isNaN(parsed)) serverNow = parsed;
+          }
         }
+        if (serverNow !== null) {
+          const estimatedClientNow = requestStartedAt + (requestFinishedAt - requestStartedAt) / 2;
+          serverClockOffsetRef.current = serverNow;
+          lastServerSyncRef.current = requestFinishedAt;
+        }
+
+        // ---- Server times ----
+        const start = data.startTime ? new Date(data.startTime) : null;
+        const end = data.endTime ? new Date(data.endTime) : null;
+        if (start && !Number.isNaN(start.getTime())) setServerStartTime(start);
+        if (end && !Number.isNaN(end.getTime())) setServerEndTime(end);
         if (data.durationMinutes !== undefined && data.durationMinutes !== null) {
           setServerDurationMinutes(Number(data.durationMinutes));
         }
 
-        if (!Number.isFinite(serverNow) || !start || !end ||
-            Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-          console.warn("Quiz status missing valid server timestamps.");
+        // ---- Quiz open ----
+        if (data.isQuizOpen) {
+          setQuizActive(true);
+          if (end && !Number.isNaN(end.getTime())) {
+            const now = getServerSyncedNow();
+            const remaining = Math.max(0, Math.ceil((end.getTime() - now) / 1000));
+            setTimeLeft(remaining);
+          }
           return;
         }
 
-        // Decide status directly from serverNow. No offset calculation.
-        if (serverNow < start.getTime()) {
-          setQuizActive(false);
-
-          const waitSeconds = Math.max(
-            0,
-            Math.ceil((start.getTime() - serverNow) / 1000)
-          );
-          setWaitTime(waitSeconds);
-          return;
-        }
-
-        if (serverNow >= end.getTime()) {
+        // ---- Quiz ended ----
+        if (data.hasEnded) {
           if (!autoSubmitted.current && !submitting) {
             alert("The quiz has ended. You cannot take it now.");
             navigate("/login", { replace: true });
@@ -264,14 +235,12 @@ function QuizPage() {
           return;
         }
 
-        // Quiz is open. Sync the countdown from serverNow -> server endTime.
-        setQuizActive(true);
-        const remaining = syncCountdownFromServer(
-          serverNow,
-          end.getTime()
-        );
-        if (remaining !== null) {
-          setTimeLeft(remaining);
+        // ---- Quiz not started ----
+        setQuizActive(false);
+        if (start && !Number.isNaN(start.getTime())) {
+          const now = getServerSyncedNow();
+          const diff = Math.max(0, Math.ceil((start.getTime() - now) / 1000));
+          setWaitTime(diff);
         }
       } catch (err) {
         console.error("Quiz status check error:", err);
@@ -288,7 +257,7 @@ function QuizPage() {
         statusIntervalRef.current = null;
       }
     };
-  }, [student, submitted, submitting, navigate, syncCountdownFromServer]);
+  }, [student, submitted, submitting, navigate, getServerSyncedNow]);
 
   // ============================================================
   // START QUIZ
@@ -512,27 +481,24 @@ function QuizPage() {
   }, [navigate, student, questions.length]);
 
   // ============================================================
-  // SERVER-TIME COUNTDOWN
+  // SERVER-SYNCHRONIZED TIMER
   // ============================================================
 
   useEffect(() => {
-    if (!quizActive || !startChecked || !quizReady || submitted || !questions.length) {
-      return;
-    }
+    if (!quizActive || !startChecked || !quizReady || submitted || !questions.length) return;
+    if (!serverEndTime || Number.isNaN(serverEndTime.getTime())) return;
 
     const updateTimer = () => {
-      const remaining = getServerRemainingSeconds();
-      if (remaining === null) return;
-
+      const now = getServerSyncedNow();
+      const remaining = Math.max(0, Math.ceil((serverEndTime.getTime() - now) / 1000));
       setTimeLeft(remaining);
-
       if (remaining <= 0) {
         handleTimeExpired();
       }
     };
 
     updateTimer();
-    timerRef.current = setInterval(updateTimer, 250);
+    timerRef.current = setInterval(updateTimer, 1000);
 
     return () => {
       if (timerRef.current) {
@@ -546,8 +512,9 @@ function QuizPage() {
     quizReady,
     submitted,
     questions.length,
+    serverEndTime,
     handleTimeExpired,
-    getServerRemainingSeconds,
+    getServerSyncedNow,
   ]);
 
   // ============================================================
