@@ -1,4 +1,4 @@
-   import React, {
+  import React, {
   useEffect,
   useState,
   useRef,
@@ -65,18 +65,49 @@ function QuizPage() {
   const autoSubmitted = useRef(false);
   const statusIntervalRef = useRef(null);
   const startRequestInProgress = useRef(false);
-  const serverClockOffsetRef = useRef(0);
-  const lastServerSyncRef = useRef(0);
+  // Server-time countdown reference. No device clock and no offset.
+  const serverCountdownRef = useRef({
+    remainingSeconds: null,
+    performanceBase: null,
+  });
 
-const serverNowRef = useRef(null);
-const syncPerformanceRef = useRef(null);
+  // ------------------------------------------------------------
+  // SERVER-TIME COUNTDOWN (NO CLOCK OFFSET)
+  // ------------------------------------------------------------
 
-const getServerSyncedNow = useCallback(() => {
-  return (
-    serverNowRef.current +
-    (performance.now() - syncPerformanceRef.current)
-  );
-}, []);
+  const syncCountdownFromServer = useCallback((serverNowMs, endMs) => {
+    if (!Number.isFinite(serverNowMs) || !Number.isFinite(endMs)) {
+      return null;
+    }
+
+    // Calculate the initial remaining time using ONLY timestamps supplied
+    // by the backend. The device's current clock is not involved.
+    const remainingSeconds = Math.max(
+      0,
+      Math.ceil((endMs - serverNowMs) / 1000)
+    );
+
+    serverCountdownRef.current = {
+      remainingSeconds,
+      performanceBase: performance.now(),
+    };
+
+    return remainingSeconds;
+  }, []);
+
+  const getServerRemainingSeconds = useCallback(() => {
+    const sync = serverCountdownRef.current;
+
+    if (sync.remainingSeconds === null || sync.performanceBase === null) {
+      return null;
+    }
+
+    const elapsedSeconds = Math.floor(
+      (performance.now() - sync.performanceBase) / 1000
+    );
+
+    return Math.max(0, sync.remainingSeconds - elapsedSeconds);
+  }, []);
 
   // ------------------------------------------------------------
   // FULLSCREEN
@@ -170,7 +201,7 @@ const getServerSyncedNow = useCallback(() => {
   }, []);
 
   // ============================================================
-  // CHECK EXAM STATUS + SERVER CLOCK SYNC
+  // CHECK EXAM STATUS USING SERVER TIME ONLY
   // ============================================================
 
   useEffect(() => {
@@ -180,56 +211,44 @@ const getServerSyncedNow = useCallback(() => {
 
     const checkStatus = async () => {
       try {
-        const requestStartedAt = Date.now();
         const res = await fetch(`${API_BASE}/quiz-status`, { cache: "no-store" });
-        const requestFinishedAt = Date.now();
 
-        if (!res.ok) throw new Error(`Quiz status request failed (${res.status})`);
+        if (!res.ok) {
+          throw new Error(`Quiz status request failed (${res.status})`);
+        }
+
         const data = await res.json();
         if (cancelled) return;
 
-        // ---- Server clock sync ----
-        let serverNow = null;
-        const possibleServerTime = data?.serverTime ?? data?.currentTime ?? data?.now;
-        if (possibleServerTime) {
-          const parsed = new Date(possibleServerTime).getTime();
-          if (!Number.isNaN(parsed)) serverNow = parsed;
-        }
-        if (serverNow === null) {
-          const dateHeader = res.headers.get("date");
-          if (dateHeader) {
-            const parsed = new Date(dateHeader).getTime();
-            if (!Number.isNaN(parsed)) serverNow = parsed;
-          }
-        }
-        if (serverNow !== null) {
-          const estimatedClientNow = requestStartedAt + (requestFinishedAt - requestStartedAt) / 2;
-          serverClockOffsetRef.current = serverNow-estimatedClientNow;
-          lastServerSyncRef.current = requestFinishedAt;
-        }
+        // Backend is authoritative. We intentionally use serverNow only.
+        const serverNow = data?.serverNow
+          ? new Date(data.serverNow).getTime()
+          : NaN;
 
-        // ---- Server times ----
-        const start = data.startTime ? new Date(data.startTime) : null;
-        const end = data.endTime ? new Date(data.endTime) : null;
-        if (start && !Number.isNaN(start.getTime())) setServerStartTime(start);
-        if (end && !Number.isNaN(end.getTime())) setServerEndTime(end);
+        const start = data?.startTime ? new Date(data.startTime) : null;
+        const end = data?.endTime ? new Date(data.endTime) : null;
+
+        if (start && !Number.isNaN(start.getTime())) {
+          setServerStartTime(start);
+        }
+        if (end && !Number.isNaN(end.getTime())) {
+          setServerEndTime(end);
+        }
         if (data.durationMinutes !== undefined && data.durationMinutes !== null) {
           setServerDurationMinutes(Number(data.durationMinutes));
         }
 
-        // ---- Quiz open ----
-        if (data.isQuizOpen) {
-          setQuizActive(true);
-          if (end && !Number.isNaN(end.getTime())) {
-            const now = getServerSyncedNow();
-            const remaining = Math.max(0, Math.ceil((end.getTime() - now) / 1000));
-            setTimeLeft(remaining);
-          }
+        if (!Number.isFinite(serverNow) || !start || !end ||
+            Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+          console.warn("Quiz status missing valid server timestamps.");
           return;
         }
 
-        // ---- Quiz ended ----
-        if (data.hasEnded) {
+        // Backend flags are authoritative. Never use the device clock.
+        if (data?.hasEnded === true) {
+          setQuizActive(false);
+          setTimeLeft(0);
+
           if (!autoSubmitted.current && !submitting) {
             alert("The quiz has ended. You cannot take it now.");
             navigate("/login", { replace: true });
@@ -237,12 +256,30 @@ const getServerSyncedNow = useCallback(() => {
           return;
         }
 
-        // ---- Quiz not started ----
-        setQuizActive(false);
-        if (start && !Number.isNaN(start.getTime())) {
-          const now = getServerSyncedNow();
-          const diff = Math.max(0, Math.ceil((start.getTime() - now) / 1000));
-          setWaitTime(diff);
+        if (data?.isQuizOpen === false) {
+          setQuizActive(false);
+
+          const waitSeconds = Math.max(
+            0,
+            Math.ceil((start.getTime() - serverNow) / 1000)
+          );
+          setWaitTime(waitSeconds);
+          return;
+        }
+
+        // Backend says the quiz is open.
+        setQuizActive(true);
+        setWaitTime(null);
+
+        // startTime/endTime are the quiz window supplied by the backend.
+        // The countdown is ALWAYS: server endTime - serverNow.
+        const remaining = syncCountdownFromServer(
+          serverNow,
+          end.getTime()
+        );
+
+        if (remaining !== null) {
+          setTimeLeft(remaining);
         }
       } catch (err) {
         console.error("Quiz status check error:", err);
@@ -259,7 +296,7 @@ const getServerSyncedNow = useCallback(() => {
         statusIntervalRef.current = null;
       }
     };
-  }, [student, submitted, submitting, navigate, getServerSyncedNow]);
+  }, [student, submitted, submitting, navigate, syncCountdownFromServer]);
 
   // ============================================================
   // START QUIZ
@@ -483,24 +520,27 @@ const getServerSyncedNow = useCallback(() => {
   }, [navigate, student, questions.length]);
 
   // ============================================================
-  // SERVER-SYNCHRONIZED TIMER
+  // SERVER-TIME COUNTDOWN
   // ============================================================
 
   useEffect(() => {
-    if (!quizActive || !startChecked || !quizReady || submitted || !questions.length) return;
-    if (!serverEndTime || Number.isNaN(serverEndTime.getTime())) return;
+    if (!quizActive || !startChecked || !quizReady || submitted || !questions.length) {
+      return;
+    }
 
     const updateTimer = () => {
-      const now = getServerSyncedNow();
-      const remaining = Math.max(0, Math.ceil((serverEndTime.getTime() - now) / 1000));
+      const remaining = getServerRemainingSeconds();
+      if (remaining === null) return;
+
       setTimeLeft(remaining);
+
       if (remaining <= 0) {
         handleTimeExpired();
       }
     };
 
     updateTimer();
-    timerRef.current = setInterval(updateTimer, 1000);
+    timerRef.current = setInterval(updateTimer, 250);
 
     return () => {
       if (timerRef.current) {
@@ -514,9 +554,8 @@ const getServerSyncedNow = useCallback(() => {
     quizReady,
     submitted,
     questions.length,
-    serverEndTime,
     handleTimeExpired,
-    getServerSyncedNow,
+    getServerRemainingSeconds,
   ]);
 
   // ============================================================
@@ -780,9 +819,12 @@ const getServerSyncedNow = useCallback(() => {
   const progress = ((current + 1) / totalQuestions) * 100;
   const custom = student?.customData || {};
   const displayName = custom.name || custom.email || student?.regNo || "Student";
-  const timerHours = Math.floor(timeLeft / 3600);
-  const timerMinutes = Math.floor((timeLeft % 3600) / 60);
-  const timerSeconds = timeLeft % 60;
+  const safeTimeLeft = Number.isFinite(Number(timeLeft))
+    ? Math.max(0, Math.floor(Number(timeLeft)))
+    : 0;
+  const timerHours = Math.floor(safeTimeLeft / 3600);
+  const timerMinutes = Math.floor((safeTimeLeft % 3600) / 60);
+  const timerSeconds = safeTimeLeft % 60;
 
   // ============================================================
   // QUIZ UI
@@ -809,7 +851,7 @@ const getServerSyncedNow = useCallback(() => {
           <span
             style={{
               ...styles.timerText,
-              color: timeLeft <= 60 ? "#dc2626" : "#000",
+              color: safeTimeLeft <= 60 ? "#dc2626" : "#000",
             }}
           >
             {timerHours.toString().padStart(2, "0")}:
@@ -821,11 +863,11 @@ const getServerSyncedNow = useCallback(() => {
         {/* SUBMIT BUTTON (manual only) */}
         <button
           onClick={submitQuiz}
-          disabled={submitted || submitting || timeLeft === 0}
+          disabled={submitted || submitting || safeTimeLeft === 0}
           style={{
             ...styles.submitBtn,
-            opacity: submitted || submitting || timeLeft === 0 ? 0.6 : 1,
-            cursor: submitted || submitting || timeLeft === 0 ? "not-allowed" : "pointer",
+            opacity: submitted || submitting || safeTimeLeft === 0 ? 0.6 : 1,
+            cursor: submitted || submitting || safeTimeLeft === 0 ? "not-allowed" : "pointer",
           }}
         >
           Submit Quiz
