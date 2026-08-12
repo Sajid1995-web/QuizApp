@@ -68,13 +68,15 @@ function QuizPage() {
   const serverClockOffsetRef = useRef(0);
   const lastServerSyncRef = useRef(0);
 
-  // ------------------------------------------------------------
-  // SERVER-SYNCHRONIZED NOW
-  // ------------------------------------------------------------
+const serverNowRef = useRef(null);
+const syncPerformanceRef = useRef(null);
 
-  const getServerSyncedNow = useCallback(() => {
-    return Date.now() + serverClockOffsetRef.current;
-  }, []);
+const getServerSyncedNow = useCallback(() => {
+  return (
+    serverNowRef.current +
+    (performance.now() - syncPerformanceRef.current)
+  );
+}, []);
 
   // ------------------------------------------------------------
   // FULLSCREEN
