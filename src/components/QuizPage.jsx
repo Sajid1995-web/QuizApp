@@ -202,7 +202,7 @@ function QuizPage() {
         }
         if (serverNow !== null) {
           const estimatedClientNow = requestStartedAt + (requestFinishedAt - requestStartedAt) / 2;
-          serverClockOffsetRef.current = serverNow;
+          serverClockOffsetRef.current = serverNow-estimatedClientNow;
           lastServerSyncRef.current = requestFinishedAt;
         }
 
