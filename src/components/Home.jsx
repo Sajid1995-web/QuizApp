@@ -1,4 +1,4 @@
-  import React, { useState } from "react";
+ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 function RulesPage() {
@@ -7,7 +7,7 @@ function RulesPage() {
 
   return (
     <div style={styles.page}>
-      {/* Embedded CSS for perfect viewport fit & mobile polish */}
+      {/* Embedded CSS – desktop layout only (no mobile overrides) */}
       <style>
         {`
           * {
@@ -20,7 +20,7 @@ function RulesPage() {
             overflow: hidden;
           }
           .rules-page-wrapper {
-            height: 100dvh; /* dynamic viewport height – works on mobile */
+            height: 100dvh;
             width: 100vw;
             display: flex;
             align-items: center;
@@ -66,73 +66,6 @@ function RulesPage() {
             overflow-y: auto;
             padding-right: 6px;
           }
-          
-          /* Mobile adjustments */
-          @media (max-width: 768px) {
-            .rules-card {
-              padding: 16px 16px 12px !important;
-              height: 100dvh !important; /* keep full viewport height */
-              overflow: hidden !important;
-            }
-            .rules-scroll-box {
-              overflow-y: auto !important;
-              height: auto !important;
-              flex: 1 1 auto !important;
-            }
-            .responsive-header {
-              flex-direction: column-reverse;
-              align-items: center;
-              gap: 16px;
-              margin-bottom: 12px;
-            }
-            .responsive-image {
-              width: 100%;
-              max-width: 180px;
-            }
-            .responsive-buttons {
-              flex-direction: column;
-              align-items: center;
-              gap: 12px;
-            }
-            .action-btn {
-              width: 100%;
-              max-width: 250px;
-              height: 44px !important;
-            }
-            .main-title {
-              font-size: 20px !important;
-            }
-            .sub-title {
-              font-size: 15px !important;
-            }
-            .highlight-text {
-              font-size: 15px !important;
-            }
-            .date-badge {
-              font-size: 14px !important;
-              padding: 6px 14px !important;
-            }
-            .desc-text {
-              font-size: 14px !important;
-            }
-            .rule-paragraph {
-              font-size: 14px !important;
-              padding: 4px 0 !important;
-            }
-            .rule-number-inline {
-              width: 26px !important;
-              height: 26px !important;
-              font-size: 12px !important;
-              line-height: 26px !important;
-              margin-right: 8px !important;
-            }
-            .nstad-box {
-              font-size: 16px !important;
-              padding: 16px 18px !important;
-              margin-top: 30px !important;
-              margin-bottom: 6px !important;
-            }
-          }
         `}
       </style>
 
@@ -145,22 +78,22 @@ function RulesPage() {
           {/* Introduction & Image Layout Container */}
           <div className="responsive-header">
             <div style={styles.introBox}>
-              <h1 style={styles.mainTitle} className="main-title">
+              <h1 style={styles.mainTitle}>
                 National Science and Technology Digital Archive (NSTAD)
               </h1>
               
-              <p style={styles.subTitle} className="sub-title">
-                invites you to participate in an <strong style={styles.highlightText} className="highlight-text">Online Quiz</strong> based on available archival documents at{" "}
+              <p style={styles.subTitle}>
+                invites you to participate in an <strong style={styles.highlightText}>Online Quiz</strong> based on available archival documents at{" "}
                 <a href="https://nstad.in" target="_blank" rel="noopener noreferrer" style={styles.nstadLink}>
                   www.nstad.in
                 </a>.
               </p>
 
-              <div style={styles.dateBadge} className="date-badge">
+              <div style={styles.dateBadge}>
                 <strong>Quiz Date:</strong> 09.08.2026 &nbsp;|&nbsp; <strong>Time:</strong> 21:00 Hrs
               </div>
 
-              <p style={styles.descText} className="desc-text">
+              <p style={styles.descText}>
                 The National Science and Technology Digital Archive (NSTAD) invites science enthusiasts, students,
                 researchers, and the general public to participate in an online quiz celebrating the life, work, and
                 scientific legacy of <strong>Acharya Prafulla Chandra Ray</strong>, one of India's greatest chemists and
@@ -174,8 +107,8 @@ function RulesPage() {
           {/* Rules Container – continuous text with highlighted numbers */}
           <div className="rules-scroll-box">
             <div style={styles.rulesTextBlock}>
-              <p style={styles.ruleParagraph} className="rule-paragraph">
-                <span style={{ ...styles.ruleNumberInline, background: "linear-gradient(135deg, #6c5ce7, #a29bfe)" }} className="rule-number-inline">
+              <p style={styles.ruleParagraph}>
+                <span style={{ ...styles.ruleNumberInline, background: "linear-gradient(135deg, #6c5ce7, #a29bfe)" }}>
                   01
                 </span>
                 <strong>Eligibility:</strong> The quiz is open to students of Class XI, Class XII, and Undergraduates
@@ -183,8 +116,8 @@ function RulesPage() {
                 permitted to submit only one entry. Multiple submissions by the same participant may lead to disqualification.
               </p>
 
-              <p style={styles.ruleParagraph} className="rule-paragraph">
-                <span style={{ ...styles.ruleNumberInline, background: "linear-gradient(135deg, #e17055, #d63031)" }} className="rule-number-inline">
+              <p style={styles.ruleParagraph}>
+                <span style={{ ...styles.ruleNumberInline, background: "linear-gradient(135deg, #e17055, #d63031)" }}>
                   02
                 </span>
                 <strong>Quiz Format:</strong> The quiz consists of multiple-choice questions (MCQs). Participants are
@@ -197,8 +130,8 @@ function RulesPage() {
                 immediately after registration can be used for participation.
               </p>
 
-              <p style={styles.ruleParagraph} className="rule-paragraph">
-                <span style={{ ...styles.ruleNumberInline, background: "linear-gradient(135deg, #00b894, #00cec9)" }} className="rule-number-inline">
+              <p style={styles.ruleParagraph}>
+                <span style={{ ...styles.ruleNumberInline, background: "linear-gradient(135deg, #00b894, #00cec9)" }}>
                   03
                 </span>
                 <strong>Submission Guidelines:</strong> The quiz will be available only on <strong>9th August, 2026
@@ -209,8 +142,8 @@ function RulesPage() {
                 treated as disqualified. Once submitted, responses cannot be edited or resubmitted.
               </p>
 
-              <p style={styles.ruleParagraph} className="rule-paragraph">
-                <span style={{ ...styles.ruleNumberInline, background: "linear-gradient(135deg, #fdcb6e, #e17055)" }} className="rule-number-inline">
+              <p style={styles.ruleParagraph}>
+                <span style={{ ...styles.ruleNumberInline, background: "linear-gradient(135deg, #fdcb6e, #e17055)" }}>
                   04
                 </span>
                 <strong>Evaluation:</strong> Each correct answer carries <strong>One mark</strong>. There is negative
@@ -220,8 +153,8 @@ function RulesPage() {
                 the highest scores in accordance with the quiz rules.
               </p>
 
-              <p style={styles.ruleParagraph} className="rule-paragraph">
-                <span style={{ ...styles.ruleNumberInline, background: "linear-gradient(135deg, #6c5ce7, #a29bfe)" }} className="rule-number-inline">
+              <p style={styles.ruleParagraph}>
+                <span style={{ ...styles.ruleNumberInline, background: "linear-gradient(135deg, #6c5ce7, #a29bfe)" }}>
                   05
                 </span>
                 <strong>Disclaimer:</strong> By participating, entrants agree to abide by these Rules &amp; Regulations.
@@ -230,8 +163,8 @@ function RulesPage() {
               </p>
             </div>
 
-            {/* NSTAD Box – now larger, more padded, lower, and striking */}
-            <div style={styles.nstadBox} className="nstad-box">
+            {/* NSTAD Box – larger, more padded, lower, and striking */}
+            <div style={styles.nstadBox}>
               <span style={styles.pinEmoji}>📌</span>{" "}
               <span style={styles.nstadBoxText}>
                 Explore the National Science and Technology Digital Archive:{" "}
@@ -436,12 +369,12 @@ const styles = {
   },
   // --- NSTAD Box – larger, more padded, lower, striking ---
   nstadBox: {
-    marginTop: "40px",          // lower on desktop
+    marginTop: "40px",
     marginBottom: "12px",
-    padding: "20px 28px",       // more padding
-    fontSize: "20px",           // larger text
+    padding: "20px 28px",
+    fontSize: "20px",
     fontWeight: "600",
-    background: "linear-gradient(135deg, #f5f3ff, #e8e4ff)", // soft gradient
+    background: "linear-gradient(135deg, #f5f3ff, #e8e4ff)",
     borderRadius: "16px",
     border: "2px solid #6c5ce7",
     boxShadow: "0 6px 20px rgba(108, 92, 231, 0.2)",
@@ -453,7 +386,7 @@ const styles = {
     flexWrap: "wrap",
   },
   pinEmoji: {
-    fontSize: "32px",           // bigger pin
+    fontSize: "32px",
     lineHeight: 1,
   },
   nstadBoxText: {
@@ -464,12 +397,10 @@ const styles = {
     fontWeight: 900,
     textDecoration: "underline",
     textUnderlineOffset: "4px",
-    fontSize: "22px",           // even bigger link
+    fontSize: "22px",
     letterSpacing: "0.5px",
     transition: "all 0.2s",
-    // add a subtle glow effect via hover in JS? but we can add a hover style in CSS
   },
-  // Keep general link style for other mentions
   nstadLink: {
     color: "#6c5ce7",
     fontWeight: 900,
