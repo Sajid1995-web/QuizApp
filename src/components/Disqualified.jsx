@@ -1,15 +1,23 @@
-import React from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+ import React, { useEffect } from "react";
+import { useLocation } from "react-router-dom";
 
 function Disqualified() {
   const { state } = useLocation();
-  const navigate = useNavigate();
 
   const reason =
     state?.reason ||
     "Your attempt has been disqualified because a quiz rule was violated.";
 
   const student = state?.student;
+
+  useEffect(() => {
+    // Redirect to nstad.in after 3 seconds
+    const timer = setTimeout(() => {
+      window.location.href = "https://www.nstad.in";
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <div
@@ -20,8 +28,7 @@ function Disqualified() {
         alignItems: "center",
         justifyContent: "center",
         padding: "20px",
-        fontFamily:
-          "Arial, Helvetica, sans-serif",
+        fontFamily: "Arial, Helvetica, sans-serif",
       }}
     >
       <div
@@ -32,10 +39,8 @@ function Disqualified() {
           borderRadius: "16px",
           padding: "45px 35px",
           textAlign: "center",
-          boxShadow:
-            "0 10px 35px rgba(0,0,0,0.12)",
-          borderTop:
-            "6px solid #dc2626",
+          boxShadow: "0 10px 35px rgba(0,0,0,0.12)",
+          borderTop: "6px solid #dc2626",
         }}
       >
         {/* Icon */}
@@ -74,8 +79,7 @@ function Disqualified() {
             marginBottom: "25px",
           }}
         >
-          Your quiz attempt has been
-          disqualified.
+          Your quiz attempt has been disqualified.
         </p>
 
         {/* Student */}
@@ -88,9 +92,7 @@ function Disqualified() {
               marginBottom: "20px",
             }}
           >
-            <strong>
-              {student.name}
-            </strong>
+            <strong>{student.name}</strong>
 
             {student.regNo && (
               <div
@@ -99,8 +101,7 @@ function Disqualified() {
                   color: "#666",
                 }}
               >
-                Registration No:{" "}
-                {student.regNo}
+                Registration No: {student.regNo}
               </div>
             )}
           </div>
@@ -127,8 +128,7 @@ function Disqualified() {
 
           <p
             style={{
-              margin:
-                "8px 0 0",
+              margin: "8px 0 0",
               color: "#7f1d1d",
               lineHeight: 1.5,
             }}
@@ -147,32 +147,14 @@ function Disqualified() {
             lineHeight: 1.5,
           }}
         >
-          Your quiz submission is no
-          longer available. Please contact
-          the administrator if you believe
-          this happened by mistake.
+          Your quiz submission is no longer available. Please contact the
+          administrator if you believe this happened by mistake.
         </div>
 
-        {/* Don't provide a Back button to the quiz */}
-        <button
-          onClick={() =>
-            navigate("/login", {
-              replace: true,
-            })
-          }
-          style={{
-            border: "none",
-            background: "#374151",
-            color: "#fff",
-            padding:
-              "12px 28px",
-            borderRadius: "8px",
-            fontSize: "16px",
-            cursor: "pointer",
-          }}
-        >
-          Return to Login
-        </button>
+        {/* Auto-redirect message */}
+        <p style={{ color: "#6b7280", fontSize: "14px" }}>
+          You will be redirected to nstad.in shortly...
+        </p>
       </div>
     </div>
   );
