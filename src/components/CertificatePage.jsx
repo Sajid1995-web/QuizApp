@@ -1,24 +1,31 @@
- import React from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+ import React, { useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import "./App.css";
 
 function ResultPage() {
-  const navigate = useNavigate();
   const { state } = useLocation();
+
+  // Auto‑redirect to nstad.in after 3 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      window.location.href = "https://www.nstad.in";
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   const { student, disqualified } = state || {};
 
-  // Handle missing state
+  // Handle missing state – show a message, but redirect will happen
   if (!state) {
     return (
       <div className="page-card">
-        <p>No result data found.</p>
-        <button onClick={() => navigate("/login")}>Back to Login</button>
+        <p>No result data found. You will be redirected to nstad.in shortly...</p>
       </div>
     );
   }
 
-  // ---- DISQUALIFIED: two‑column layout (unchanged) ----
+  // ---- DISQUALIFIED: two‑column layout (no button) ----
   if (disqualified) {
     return (
       <div style={styles.page}>
@@ -38,20 +45,9 @@ function ResultPage() {
               <p style={{ color: "#666", marginTop: 10 }}>
                 Your submission was not recorded.
               </p>
-              <button
-                onClick={() => navigate("/")}
-                style={{
-                  marginTop: 20,
-                  padding: "10px 20px",
-                  backgroundColor: "#dc3545",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 6,
-                  cursor: "pointer",
-                }}
-              >
-                Back to Home
-              </button>
+              <p style={{ color: "#6b7280", fontSize: 14, marginTop: 20 }}>
+                Redirecting to nstad.in shortly...
+              </p>
             </div>
           </div>
         </div>
@@ -59,7 +55,7 @@ function ResultPage() {
     );
   }
 
-  // ---- SUCCESSFUL SUBMISSION: Background image + certificate overlay ----
+  // ---- SUCCESSFUL SUBMISSION: Background image + certificate overlay (no button) ----
   return (
     <div style={styles.pageWithBg}>
       <div style={styles.certificate}>
@@ -91,13 +87,9 @@ function ResultPage() {
         </div>
 
         <div style={styles.certFooter}>
-          {/* Replaced button with plain text link */}
-          <span
-            style={styles.homeLink}
-            onClick={() => navigate("/")}
-          >
-            Back to Home
-          </span>
+          <p style={{ color: "#6b7280", fontSize: 14, margin: 0 }}>
+            Redirecting to nstad.in shortly...
+          </p>
         </div>
       </div>
     </div>
@@ -201,14 +193,5 @@ const styles = {
     marginTop: "2rem",
     borderTop: "2px dashed #e5e7eb",
     paddingTop: "1.5rem",
-  },
-  // New style for the home link – plain black text
-  homeLink: {
-    color: "#000",
-    fontSize: "16px",
-    fontWeight: 500,
-    cursor: "pointer",
-    textDecoration: "underline",
-    transition: "color 0.2s",
   },
 };
